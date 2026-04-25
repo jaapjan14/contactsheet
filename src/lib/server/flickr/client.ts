@@ -1,4 +1,4 @@
-import { FLICKR_API_KEY, FLICKR_API_SECRET } from '$env/static/private';
+import { requireEnv } from '$lib/server/env';
 import { signOAuth1 } from './oauth';
 
 const REST_ENDPOINT = 'https://api.flickr.com/services/rest';
@@ -21,9 +21,10 @@ export class FlickrError extends Error {
 }
 
 export async function flickr<T = unknown>(opts: FlickrCallOptions): Promise<T> {
+	const apiKey = requireEnv('FLICKR_API_KEY');
 	const baseParams: Record<string, string> = {
 		method: opts.method,
-		api_key: FLICKR_API_KEY,
+		api_key: apiKey,
 		format: 'json',
 		nojsoncallback: '1',
 		...(opts.params ?? {})
@@ -32,8 +33,8 @@ export async function flickr<T = unknown>(opts: FlickrCallOptions): Promise<T> {
 	let finalParams: Record<string, string> = baseParams;
 	if (opts.signed) {
 		const oauthParams = signOAuth1('GET', REST_ENDPOINT, baseParams, {
-			consumerKey: FLICKR_API_KEY,
-			consumerSecret: FLICKR_API_SECRET,
+			consumerKey: apiKey,
+			consumerSecret: requireEnv('FLICKR_API_SECRET'),
 			token: opts.token?.token,
 			tokenSecret: opts.token?.secret
 		});

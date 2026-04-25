@@ -1,4 +1,4 @@
-import { FLICKR_API_KEY, FLICKR_API_SECRET } from '$env/static/private';
+import { requireEnv } from '$lib/server/env';
 import { signOAuth1 } from '$lib/server/flickr/oauth';
 
 const REQUEST_TOKEN_URL = 'https://www.flickr.com/services/oauth/request_token';
@@ -30,8 +30,8 @@ async function postOAuth(url: string, params: Record<string, string>): Promise<U
 export async function getRequestToken(callbackUrl: string): Promise<RequestTokenResult> {
 	const params: Record<string, string> = { oauth_callback: callbackUrl };
 	const oauth = signOAuth1('GET', REQUEST_TOKEN_URL, params, {
-		consumerKey: FLICKR_API_KEY,
-		consumerSecret: FLICKR_API_SECRET
+		consumerKey: requireEnv('FLICKR_API_KEY'),
+		consumerSecret: requireEnv('FLICKR_API_SECRET')
 	});
 	const merged = { ...params, ...oauth };
 	const parsed = await postOAuth(REQUEST_TOKEN_URL, merged);
@@ -59,8 +59,8 @@ export async function exchangeForAccessToken(
 ): Promise<AccessTokenResult> {
 	const params: Record<string, string> = { oauth_verifier: oauthVerifier };
 	const oauth = signOAuth1('GET', ACCESS_TOKEN_URL, params, {
-		consumerKey: FLICKR_API_KEY,
-		consumerSecret: FLICKR_API_SECRET,
+		consumerKey: requireEnv('FLICKR_API_KEY'),
+		consumerSecret: requireEnv('FLICKR_API_SECRET'),
 		token: oauthToken,
 		tokenSecret: requestTokenSecret
 	});

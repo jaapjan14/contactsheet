@@ -1,0 +1,21 @@
+# Copy to docker-compose.yml and adjust as needed.
+# `data/` holds the OAuth token (data/auth.json) — mount as a volume to persist
+# sign-in across container rebuilds.
+
+services:
+  contactsheet:
+    build: .
+    image: contactsheet:latest
+    container_name: contactsheet
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      # Either set these inline or use env_file
+      FLICKR_API_KEY: ${FLICKR_API_KEY}
+      FLICKR_API_SECRET: ${FLICKR_API_SECRET}
+      # ORIGIN must match the URL the app is reached at — required for SvelteKit
+      # form actions (Flickr OAuth callback included).
+      ORIGIN: http://localhost:3000
+    volumes:
+      - ./data:/app/data

@@ -122,3 +122,15 @@
   - Optimistic local update on success — no full page reload.
   - Live values reset when the route param changes (so paging away and back is
     clean).
+- **Dockerized.** Multi-stage Dockerfile (Node 22 alpine) → final image ~230MB.
+  Runs as non-root `node` user. Volume `/app/data` for persisting OAuth tokens
+  across rebuilds. `HEALTHCHECK` polls `/`. `docker-compose.example.yml` copies
+  to `docker-compose.yml`. Verified end-to-end: built → ran → `/health` round-
+  tripped Flickr → `/user/lakatua/photostream` rendered 100 thumbnails.
+- Switched `FLICKR_API_KEY` / `FLICKR_API_SECRET` from `$env/static/private`
+  (build-time inlined) to `$env/dynamic/private` via `src/lib/server/env.ts`.
+  Reason: with build-time env, the image bakes in whatever keys were set when
+  the image was built — defeats the purpose of a portable container. With
+  dynamic env, one image works for any consumer key/secret pair.
+- README updated with both `npm run dev` and `docker compose up` instructions,
+  plus a route map.
