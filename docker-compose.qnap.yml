@@ -29,17 +29,17 @@ services:
     restart: unless-stopped
 
     ports:
-      # Host:container — change the host side if 3417 is in use on the NAS.
-      - '3417:3000'
+      # Host:container. NAS 3416 is darkroom, 3417 is piwigo — using 3418.
+      - '3418:3000'
 
     environment:
       FLICKR_API_KEY: ${FLICKR_API_KEY}
       FLICKR_API_SECRET: ${FLICKR_API_SECRET}
       # ORIGIN must match the URL the app is reached at. SvelteKit uses it for
       # form-action and OAuth-callback origin checks. Pick whichever applies:
-      #   - LAN only:        http://192.168.0.199:3417
+      #   - LAN only:        http://192.168.0.199:3418
       #   - Cloudflare tunnel: https://contactsheet.jjlnas.com
-      ORIGIN: ${CONTACTSHEET_ORIGIN:-http://192.168.0.199:3417}
+      ORIGIN: ${CONTACTSHEET_ORIGIN:-http://192.168.0.199:3418}
 
     volumes:
       # Persists the OAuth token (data/auth.json) across image rebuilds.
