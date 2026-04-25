@@ -264,3 +264,45 @@ export interface UrlsLookupGroupResponse {
 	stat: string;
 	group: { id: string; groupname: FlickrTextNode };
 }
+
+export interface FlickrGallery {
+	id: string;
+	url: string;
+	owner: string;
+	username?: string;
+	primary_photo_id: string;
+	primary_photo_server: string;
+	primary_photo_farm?: number | string;
+	primary_photo_secret: string;
+	count_photos: number | string;
+	count_videos?: number | string;
+	count_views?: string;
+	count_comments?: string;
+	title: FlickrTextNode;
+	description: FlickrTextNode;
+	date_create: string;
+	date_update: string;
+}
+
+export interface GalleriesList {
+	page: number;
+	pages: number;
+	per_page: number | string;
+	total: number | string;
+	gallery: FlickrGallery[];
+}
+
+export interface GalleriesGetListResponse {
+	stat: string;
+	galleries: GalleriesList;
+}
+
+export interface GalleriesGetPhotosResponse {
+	stat: string;
+	photos: PhotosPage & { gallery_id?: string };
+}
+
+export interface GalleriesGetInfoResponse {
+	stat: string;
+	gallery: FlickrGallery;
+}

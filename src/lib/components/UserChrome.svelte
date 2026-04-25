@@ -26,8 +26,8 @@
 		{ slug: 'photostream', label: 'Photostream' },
 		{ slug: 'albums', label: 'Albums' },
 		{ slug: 'faves', label: 'Faves' },
-		{ slug: 'galleries', label: 'Galleries', disabled: true },
-		{ slug: 'groups', label: 'Groups', disabled: true },
+		{ slug: 'galleries', label: 'Galleries' },
+		{ slug: 'groups', label: 'Groups' },
 		...(isSelf
 			? [
 					{ slug: 'camera-roll', label: 'Camera Roll' },

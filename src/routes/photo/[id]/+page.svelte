@@ -118,9 +118,10 @@
 	}
 
 	type StreamCtx =
-		| { ids: string[]; userKey: string; tab: string; albumId?: undefined; groupId?: undefined }
-		| { ids: string[]; albumId: string; tab: 'album'; userKey?: undefined; groupId?: undefined }
-		| { ids: string[]; groupId: string; tab: 'group'; userKey?: undefined; albumId?: undefined };
+		| { ids: string[]; userKey: string; tab: string; albumId?: undefined; groupId?: undefined; galleryId?: undefined }
+		| { ids: string[]; albumId: string; tab: 'album'; userKey?: undefined; groupId?: undefined; galleryId?: undefined }
+		| { ids: string[]; groupId: string; tab: 'group'; userKey?: undefined; albumId?: undefined; galleryId?: undefined }
+		| { ids: string[]; galleryId: string; tab: 'gallery'; userKey?: undefined; albumId?: undefined; groupId?: undefined };
 
 	let streamCtx = $state<StreamCtx | null>(null);
 	let position = $derived(streamCtx ? streamCtx.ids.indexOf(photo.id) : -1);
@@ -136,7 +137,9 @@
 				? `/album/${streamCtx.albumId}`
 				: streamCtx.groupId
 					? `/group/${streamCtx.groupId}`
-					: `/user/${streamCtx.userKey}/${streamCtx.tab}`
+					: streamCtx.galleryId
+						? `/gallery/${streamCtx.galleryId}`
+						: `/user/${streamCtx.userKey}/${streamCtx.tab}`
 			: ownerHref
 	);
 

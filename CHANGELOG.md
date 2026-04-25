@@ -177,3 +177,24 @@
   page wrapper was bleeding into `<article class="comment">`, turning every
   comment into a broken 2-column grid where the header collided with the body
   text. Added `display: block` to `.comment` to override.
+- **Groups tab** (`/user/[id]/groups`): grid of "tile" links, each going to
+  `/group/[nsid]`. Roles ("admin", "invite-only", "18+") render as small badges
+  next to the name when present. `flickr.people.getGroups` requires authenticated
+  read perms even for public info, so this delegates to `flickrAuth` (which
+  redirects unsigned visitors to /auth/start).
+- **Galleries tab** (`/user/[id]/galleries` + `/gallery/[id]`): grid of gallery
+  cover cards mirroring the Albums layout, plus a per-gallery detail page with
+  the same paginated infinite-scroll grid pattern. JSON pagination endpoint at
+  `/api/gallery/[id]/photos`. Lightbox stream context now also accepts
+  `{ galleryId, tab: 'gallery' }` so close-button / arrow-paging stays inside
+  the gallery context.
+- **HTML-entity decoder**: Flickr returns several text fields (group names
+  especially) HTML-entity-encoded — Svelte's `{}` then double-encodes the
+  leading `&`, surfacing `&amp;quot;SEASCAPE&amp;quot;` instead of `"SEASCAPE"`.
+  New `decodeFlickrEntities()` helper at `src/lib/flickr/text.ts` runs the
+  decode pass before Svelte's interpolation. Applied to group names; other
+  title fields (album / gallery / photo titles) likely need the same treatment
+  but defer until a visible artifact pops up.
+- All five tab slots in the user nav are now live (Photostream, Albums, Faves,
+  Galleries, Groups), plus Camera Roll + Stats when viewing your own profile.
+  Nothing greyed out anymore.
