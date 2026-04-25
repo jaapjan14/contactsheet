@@ -2,27 +2,30 @@
 #
 # DEPLOYMENT
 # ----------
-# 1. Place the project source tree on the NAS at:
-#       /share/ProgramData-vol5/Containers/contactsheet/
-#    (Dockerfile, src/, package.json, etc. — everything the build needs.)
+# 1. Place the project source tree at the resolved physical path on the NAS:
+#       /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet/
+#    (NOT /share/ProgramData-vol5/... — that's a symlink, and Container Station
+#    rejects symlinked paths for bind mounts.)
 #
 # 2. In that same directory, create a `.env` file with:
 #       FLICKR_API_KEY=...
 #       FLICKR_API_SECRET=...
-#    (Container Station picks it up automatically because it sits next to this
-#    compose file.)
+#       ORIGIN=http://192.168.0.199:3418     (LAN testing)
+#       # or ORIGIN=https://contactsheet.jjlnas.com  (Cloudflare tunnel later)
+#    Values are loaded into the container via `env_file:` below — Container
+#    Station does NOT auto-parse `.env` for `${VAR}` substitution in the YAML.
 #
 # 3. Container Station → Applications → Create → paste this YAML → Apply.
 #    First run builds the image from source on the NAS; subsequent runs are
 #    instant.
 #
 # Mirrors Darkroom Log's container layout (host port + NAS-volume path).
-# Adjust the host port (CONTACTSHEET_PORT below) if 3417 is taken on the NAS.
+# 3416 is darkroom, 3417 is piwigo — bump the host port if 3418 ever clashes.
 
 services:
   contactsheet:
     build:
-      context: /share/ProgramData-vol5/Containers/contactsheet
+      context: /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet
       dockerfile: Dockerfile
     image: contactsheet:local
     container_name: contactsheet
@@ -45,4 +48,4 @@ services:
 
     volumes:
       # Persists the OAuth token (data/auth.json) across image rebuilds.
-      - /share/ProgramData-vol5/Containers/contactsheet/data:/app/data
+      - /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet/data:/app/data
