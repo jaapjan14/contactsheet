@@ -33,11 +33,14 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 		per_page: String(opts.perPage ?? DEFAULT_PER_PAGE),
 		page: String(opts.page ?? 1),
 		extras: 'date_taken,views,o_dims,owner_name,path_alias',
-		// 3 = unrestricted (safe + moderate + restricted). ContactSheet is a
-		// personal tool — no need to filter adult content.
+		// 3 = unrestricted (safe + moderate + restricted). Personal tool, no
+		// reason to filter adult content. Requires a signed call to take effect
+		// (Flickr silently downgrades unsigned restricted requests).
 		safe_search: '3',
-		content_type: '1',
-		media: 'photos',
+		// content_type=7 = photos + screenshots + other; media=all = include
+		// videos. Matches what Flickr.com's own search returns by default.
+		content_type: '7',
+		media: 'all',
 		sort: opts.sort ?? 'relevance'
 	};
 	if (opts.text) params.text = opts.text;
