@@ -230,3 +230,21 @@
   paginated infinite-scroll grid pattern as the rest of the app, JSON endpoint
   at `/api/search/photos`. Lightbox stream context now also accepts
   `{ searchPath, tab: 'search' }` so closing returns to the same query.
+- **Lightbox swipe-up-to-close** (Darkroom Log Library tab parity): wheel
+  handler now tracks vertical accumulator separately from horizontal — at
+  `wheelAccumY < -80` with mostly-vertical motion (`|deltaX| < 40`), the
+  lightbox closes. Doesn't `preventDefault` so the metadata aside still
+  scrolls normally.
+- **Back-button jitter fixes**:
+  - `onNavigate` hook now skips View Transitions on `popstate` navigations.
+    With 100+ named-element thumbnails (`view-transition-name: photo-{id}`),
+    the browser was doing significant per-element snapshot work even on
+    "back to where I was" — the morph adds value going forward but is just
+    overhead going back. The user expects "back" to be instant.
+  - **SvelteKit Snapshot API** on every grid page (photostream, album,
+    group, gallery, faves, camera-roll, search). Captures the appended
+    `photos` array, `currentPage`, and `totalPages` so a back navigation
+    after `loadMore` restores the FULL list, not just the initial server-
+    loaded 100. Without this, scroll restoration would clamp to a shorter
+    page and the user would lose their place if they'd scrolled past the
+    first batch.

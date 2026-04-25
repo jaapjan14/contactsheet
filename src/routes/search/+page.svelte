@@ -1,16 +1,45 @@
+<script lang="ts" module>
+	import type { Snapshot } from './$types';
+	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
+
+	interface SnapState {
+		searchPath: string;
+		photos: FlickrPhotoSummary[];
+		currentPage: number;
+		totalPages: number;
+		total: number | string;
+	}
+	let snapHolder: SnapState | null = null;
+	export const snapshot: Snapshot<SnapState | null> = {
+		capture: () => snapHolder,
+		restore: (v) => {
+			snapHolder = v;
+		}
+	};
+</script>
+
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { photoUrl } from '$lib/flickr/urls';
 	import type { PageData } from './$types';
-	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
 
 	let { data }: { data: PageData } = $props();
 
-	let photos = $state<FlickrPhotoSummary[]>(untrack(() => data.photos?.photo ?? []));
-	let currentPage = $state(untrack(() => data.photos?.page ?? 1));
-	let totalPages = $state(untrack(() => data.photos?.pages ?? 1));
-	let total = $state(untrack(() => data.photos?.total ?? 0));
+	const restored = untrack(() =>
+		snapHolder?.searchPath === $page.url.search ? snapHolder : null
+	);
+
+	let photos = $state<FlickrPhotoSummary[]>(
+		untrack(() => restored?.photos ?? data.photos?.photo ?? [])
+	);
+	let currentPage = $state(
+		untrack(() => restored?.currentPage ?? data.photos?.page ?? 1)
+	);
+	let totalPages = $state(
+		untrack(() => restored?.totalPages ?? data.photos?.pages ?? 1)
+	);
+	let total = $state(untrack(() => restored?.total ?? data.photos?.total ?? 0));
 	let loading = $state(false);
 	let lastSearchPath = $state(untrack(() => $page.url.search));
 	let sentinelEl: HTMLElement | null = $state(null);
@@ -38,6 +67,13 @@
 			totalPages = data.photos?.pages ?? 1;
 			total = data.photos?.total ?? 0;
 		}
+		snapHolder = {
+			searchPath: $page.url.search,
+			photos,
+			currentPage,
+			totalPages,
+			total
+		};
 		if (photos.length > 0) {
 			stashStream(photos.map((p) => p.id));
 		}

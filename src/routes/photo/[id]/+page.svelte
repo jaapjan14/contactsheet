@@ -167,13 +167,16 @@
 	let fullscreen = $state(false);
 	let figureEl: HTMLElement | null = $state(null);
 
-	// Bumped from 90 → 180 so a casual two-finger horizontal swipe (which on Mac
-	// also competes with the browser back-gesture) doesn't accidentally page the
-	// photo. Keyboard arrows + click on the on-screen prev/next chevrons remain
-	// the precise paging inputs.
+	// Horizontal swipe = page prev/next; vertical = swipe-up-to-close.
+	// Horizontal threshold bumped to 180 so casual two-finger motion (which on
+	// macOS competes with the browser back-gesture) doesn't accidentally page.
+	// Vertical threshold matches Darkroom Log's library tab (-80 cumulative
+	// deltaY).
 	const SWIPE_PX = 180;
+	const VERT_CLOSE_PX = 80;
 	let cooldownUntil = 0;
-	let wheelAccum = 0;
+	let wheelAccumX = 0;
+	let wheelAccumY = 0;
 
 	function pageTo(id: string | null) {
 		if (!id) return;
@@ -246,18 +249,39 @@
 		if (!figureEl) return;
 
 		const onWheel = (e: WheelEvent) => {
-			if (Math.abs(e.deltaX) < Math.abs(e.deltaY) * 1.2) {
-				wheelAccum = 0;
+			const absX = Math.abs(e.deltaX);
+			const absY = Math.abs(e.deltaY);
+
+			// Vertical-dominated motion: track for swipe-up-to-close.
+			// Don't preventDefault — let the browser scroll if there's anything
+			// scrollable nearby (the metadata aside, mostly).
+			if (absY > absX * 1.5) {
+				wheelAccumX = 0;
+				if (Date.now() < cooldownUntil) return;
+				wheelAccumY += e.deltaY;
+				if (wheelAccumY < -VERT_CLOSE_PX && absX < 40) {
+					wheelAccumY = 0;
+					cooldownUntil = Date.now() + 350;
+					close();
+				}
+				return;
+			}
+
+			// Horizontal-dominated motion: page prev/next.
+			if (absX < absY * 1.2) {
+				wheelAccumX = 0;
+				wheelAccumY = 0;
 				return;
 			}
 			e.preventDefault();
 			if (Date.now() < cooldownUntil) return;
-			wheelAccum += e.deltaX;
-			if (wheelAccum > SWIPE_PX) {
-				wheelAccum = 0;
+			wheelAccumY = 0;
+			wheelAccumX += e.deltaX;
+			if (wheelAccumX > SWIPE_PX) {
+				wheelAccumX = 0;
 				pageTo(nextId);
-			} else if (wheelAccum < -SWIPE_PX) {
-				wheelAccum = 0;
+			} else if (wheelAccumX < -SWIPE_PX) {
+				wheelAccumX = 0;
 				pageTo(prevId);
 			}
 		};

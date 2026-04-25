@@ -8,6 +8,12 @@
 
 	onNavigate((navigation) => {
 		if (typeof document === 'undefined' || !('startViewTransition' in document)) return;
+		// Skip view transitions on browser back/forward (popstate). Back from
+		// the lightbox to a 100-thumbnail grid was triggering visible jitter
+		// because the browser has to snapshot every named element before the
+		// cross-fade. The user expects "back" to be instant; the morph effect
+		// only adds value going forward.
+		if (navigation.type === 'popstate') return;
 		return new Promise((resolve) => {
 			(document as Document & {
 				startViewTransition: (cb: () => Promise<void>) => unknown;

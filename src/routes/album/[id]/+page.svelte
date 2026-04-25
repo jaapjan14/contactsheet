@@ -1,15 +1,40 @@
+<script lang="ts" module>
+	import type { Snapshot } from './$types';
+	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
+
+	interface SnapState {
+		albumId: string;
+		photos: FlickrPhotoSummary[];
+		currentPage: number;
+		totalPages: number;
+	}
+
+	let snapHolder: SnapState | null = null;
+	export const snapshot: Snapshot<SnapState | null> = {
+		capture: () => snapHolder,
+		restore: (v) => {
+			snapHolder = v;
+		}
+	};
+</script>
+
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import UserChrome from '$lib/components/UserChrome.svelte';
 	import { photoUrl } from '$lib/flickr/urls';
 	import type { PageData } from './$types';
-	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
 
 	let { data }: { data: PageData } = $props();
 
-	let photos = $state<FlickrPhotoSummary[]>(untrack(() => data.album.photo));
-	let currentPage = $state(untrack(() => data.album.page));
-	let totalPages = $state(untrack(() => data.album.pages));
+	const restored = untrack(() =>
+		snapHolder?.albumId === data.albumId ? snapHolder : null
+	);
+
+	let photos = $state<FlickrPhotoSummary[]>(
+		untrack(() => restored?.photos ?? data.album.photo)
+	);
+	let currentPage = $state(untrack(() => restored?.currentPage ?? data.album.page));
+	let totalPages = $state(untrack(() => restored?.totalPages ?? data.album.pages));
 	let loading = $state(false);
 	let lastAlbumId = $state(untrack(() => data.albumId));
 	let sentinelEl: HTMLElement | null = $state(null);
@@ -32,6 +57,7 @@
 			currentPage = data.album.page;
 			totalPages = data.album.pages;
 		}
+		snapHolder = { albumId: data.albumId, photos, currentPage, totalPages };
 		stashStream(
 			photos.map((p) => p.id),
 			data.albumId

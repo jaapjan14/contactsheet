@@ -1,15 +1,43 @@
+<script lang="ts" module>
+	import type { Snapshot } from './$types';
+	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
+
+	interface SnapState {
+		userKey: string;
+		photos: FlickrPhotoSummary[];
+		currentPage: number;
+		totalPages: number;
+	}
+
+	// Module-level holder so the script-block snapshot funcs can read/write it.
+	// SvelteKit calls capture before nav-away and restore after nav-back.
+	let snapHolder: SnapState | null = null;
+
+	export const snapshot: Snapshot<SnapState | null> = {
+		capture: () => snapHolder,
+		restore: (v) => {
+			snapHolder = v;
+		}
+	};
+</script>
+
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import UserChrome from '$lib/components/UserChrome.svelte';
 	import { photoUrl } from '$lib/flickr/urls';
 	import type { PageData } from './$types';
-	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
 
 	let { data }: { data: PageData } = $props();
 
-	let photos = $state<FlickrPhotoSummary[]>(untrack(() => data.photos.photo));
-	let currentPage = $state(untrack(() => data.photos.page));
-	let totalPages = $state(untrack(() => data.photos.pages));
+	const restored = untrack(() =>
+		snapHolder?.userKey === data.userKey ? snapHolder : null
+	);
+
+	let photos = $state<FlickrPhotoSummary[]>(
+		untrack(() => restored?.photos ?? data.photos.photo)
+	);
+	let currentPage = $state(untrack(() => restored?.currentPage ?? data.photos.page));
+	let totalPages = $state(untrack(() => restored?.totalPages ?? data.photos.pages));
 	let loading = $state(false);
 	let lastUserKey = $state(untrack(() => data.userKey));
 	let sentinelEl: HTMLElement | null = $state(null);
@@ -32,6 +60,14 @@
 			currentPage = data.photos.page;
 			totalPages = data.photos.pages;
 		}
+		// Keep the snapshot holder current so capture has the latest state
+		// without needing to recompute on nav-away.
+		snapHolder = {
+			userKey: data.userKey,
+			photos,
+			currentPage,
+			totalPages
+		};
 		stashStream(
 			photos.map((p) => p.id),
 			data.userKey
