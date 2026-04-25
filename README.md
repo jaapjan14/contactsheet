@@ -48,6 +48,28 @@ docker run -p 3000:3000 \
     contactsheet
 ```
 
+## Deploy to QNAP (Container Station)
+
+Use `docker-compose.qnap.yml`. The convention mirrors Darkroom Log:
+
+```sh
+# from the dev machine, sync source to NAS
+rsync -av --delete \
+    --exclude node_modules --exclude .svelte-kit --exclude build --exclude data --exclude .git \
+    ./ jtalakua@192.168.0.199:/share/ProgramData-vol5/Containers/contactsheet/
+
+# on the NAS, place secrets next to the compose file
+ssh -p 1056 jtalakua@192.168.0.199 \
+    'cat > /share/ProgramData-vol5/Containers/contactsheet/.env <<EOF
+FLICKR_API_KEY=...
+FLICKR_API_SECRET=...
+EOF'
+```
+
+Then Container Station → Applications → Create → paste the contents of
+`docker-compose.qnap.yml` → Apply. First run builds; subsequent runs are
+instant.
+
 ## What's there
 
 | Route                            | What                                                          |

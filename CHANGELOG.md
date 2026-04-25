@@ -134,3 +134,7 @@
   dynamic env, one image works for any consumer key/secret pair.
 - README updated with both `npm run dev` and `docker compose up` instructions,
   plus a route map.
+- `docker-compose.qnap.yml` for Container Station deployment on the NAS at
+  `/share/ProgramData-vol5/Containers/contactsheet/` (mirrors Darkroom Log's
+  layout). README has the rsync + paste-into-Container-Station flow.
+  Image still builds on the NAS from source — no Docker Hub push required.
