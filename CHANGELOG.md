@@ -248,3 +248,23 @@
     loaded 100. Without this, scroll restoration would clamp to a shorter
     page and the user would lose their place if they'd scrolled past the
     first batch.
+- **SQLite cache layer** (`src/lib/server/cache.ts`, `data/cache.db`):
+  - `better-sqlite3`-backed key-value store with TTL. WAL mode, expired-key
+    purge every minute, single connection survives HMR via globalThis.
+  - Wrapped through helpers that key by method name + sorted params:
+    photo getInfo / getSizes / getExif (7-30d), comments (60s), people getInfo
+    (1h), people getPhotos (60s), photoset list/photos (5m), gallery list /
+    info / photos (5-60m), group info (24h) / pool (5m) / userGroups (5m),
+    favorites public (5m) / own (30s), search results (60s),
+    resolveUserId / resolveGroupId (30d).
+  - Replaced the in-memory `Map`s in `users.ts` and `groups.ts` with the
+    persistent cache so resolved NSIDs survive container restarts.
+  - Photo metadata moved to a new `src/lib/server/flickr/photos.ts` so the
+    photo page's load function is a thin Promise.all over four cached calls.
+  - Added `getPersonInfo()` to `people.ts` and updated all 9 page server
+    loads that fetched user info inline to use it — same call across
+    photostream/albums/faves/galleries/groups/camera-roll/stats/album/gallery
+    now hits the cache after the first request.
+  - Cold-vs-warm timing: 421ms → 14ms on `/user/lakatua/photostream`
+    (~30× faster on repeat visits). Cache db persists in the existing
+    `/app/data` volume, gitignored.

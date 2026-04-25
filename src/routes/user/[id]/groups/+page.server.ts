@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
-import { flickr, FlickrError } from '$lib/server/flickr/client';
+import { FlickrError } from '$lib/server/flickr/client';
 import { resolveUserId } from '$lib/server/flickr/users';
+import { getPersonInfo } from '$lib/server/flickr/people';
 import { getUserGroups } from '$lib/server/flickr/groups';
-import type { PeopleGetInfoResponse } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -16,17 +16,11 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw err;
 	}
 
-	const [info, groups] = await Promise.all([
-		flickr<PeopleGetInfoResponse>({
-			method: 'flickr.people.getInfo',
-			params: { user_id: userId }
-		}),
-		getUserGroups(userId)
-	]);
+	const [user, groups] = await Promise.all([getPersonInfo(userId), getUserGroups(userId)]);
 
 	return {
 		userKey: params.id,
-		user: info.person,
+		user,
 		groups
 	};
 };

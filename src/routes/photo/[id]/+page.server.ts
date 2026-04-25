@@ -1,12 +1,12 @@
 import { error } from '@sveltejs/kit';
-import { flickr, FlickrError } from '$lib/server/flickr/client';
-import type {
-	PhotosGetInfoResponse,
-	PhotosGetSizesResponse,
-	PhotosGetExifResponse,
-	PhotosCommentsGetListResponse,
-	FlickrSizeEntry
-} from '$lib/server/flickr/types';
+import { FlickrError } from '$lib/server/flickr/client';
+import {
+	getPhotoInfo,
+	getPhotoSizes,
+	getPhotoExif,
+	getPhotoComments
+} from '$lib/server/flickr/photos';
+import type { FlickrSizeEntry } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
 const TARGET_DISPLAY_WIDTH = 2048;
@@ -21,33 +21,21 @@ function pickDisplaySize(sizes: FlickrSizeEntry[]): FlickrSizeEntry | null {
 
 export const load: PageServerLoad = async ({ params }) => {
 	try {
-		const [info, sizes, exif, comments] = await Promise.all([
-			flickr<PhotosGetInfoResponse>({
-				method: 'flickr.photos.getInfo',
-				params: { photo_id: params.id }
-			}),
-			flickr<PhotosGetSizesResponse>({
-				method: 'flickr.photos.getSizes',
-				params: { photo_id: params.id }
-			}),
-			flickr<PhotosGetExifResponse>({
-				method: 'flickr.photos.getExif',
-				params: { photo_id: params.id }
-			}).catch(() => null),
-			flickr<PhotosCommentsGetListResponse>({
-				method: 'flickr.photos.comments.getList',
-				params: { photo_id: params.id }
-			}).catch(() => null)
+		const [photo, sizes, exif, comments] = await Promise.all([
+			getPhotoInfo(params.id),
+			getPhotoSizes(params.id),
+			getPhotoExif(params.id),
+			getPhotoComments(params.id)
 		]);
 
-		const display = pickDisplaySize(sizes.sizes.size);
+		const display = pickDisplaySize(sizes);
 		if (!display) throw error(404, 'No displayable sizes for this photo');
 
 		return {
-			photo: info.photo,
+			photo,
 			display,
-			exif: exif?.photo ?? null,
-			comments: comments?.comments.comment ?? []
+			exif,
+			comments
 		};
 	} catch (err) {
 		if (err instanceof FlickrError) {

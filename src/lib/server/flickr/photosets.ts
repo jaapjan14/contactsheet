@@ -1,4 +1,5 @@
 import { flickr } from './client';
+import { wrap, key } from '$lib/server/cache';
 import type {
 	PhotosetsGetListResponse,
 	PhotosetGetPhotosResponse,
@@ -7,21 +8,29 @@ import type {
 } from './types';
 
 const DEFAULT_PER_PAGE = 100;
+const TTL_LIST = 5 * 60;
+const TTL_PHOTOS = 5 * 60;
 
 export async function getUserAlbums(
 	userId: string,
 	page = 1,
 	perPage = DEFAULT_PER_PAGE
 ): Promise<PhotosetsList> {
-	const res = await flickr<PhotosetsGetListResponse>({
-		method: 'flickr.photosets.getList',
-		params: {
-			user_id: userId,
-			per_page: String(perPage),
-			page: String(page)
+	return wrap(
+		key('photosets.getList', { user_id: userId, page, per_page: perPage }),
+		TTL_LIST,
+		async () => {
+			const res = await flickr<PhotosetsGetListResponse>({
+				method: 'flickr.photosets.getList',
+				params: {
+					user_id: userId,
+					per_page: String(perPage),
+					page: String(page)
+				}
+			});
+			return res.photosets;
 		}
-	});
-	return res.photosets;
+	);
 }
 
 export async function getAlbumPhotos(
@@ -29,14 +38,20 @@ export async function getAlbumPhotos(
 	page = 1,
 	perPage = DEFAULT_PER_PAGE
 ): Promise<PhotosetWithPhotos> {
-	const res = await flickr<PhotosetGetPhotosResponse>({
-		method: 'flickr.photosets.getPhotos',
-		params: {
-			photoset_id: albumId,
-			per_page: String(perPage),
-			page: String(page),
-			extras: 'date_taken,views,o_dims'
+	return wrap(
+		key('photosets.getPhotos', { album_id: albumId, page, per_page: perPage }),
+		TTL_PHOTOS,
+		async () => {
+			const res = await flickr<PhotosetGetPhotosResponse>({
+				method: 'flickr.photosets.getPhotos',
+				params: {
+					photoset_id: albumId,
+					per_page: String(perPage),
+					page: String(page),
+					extras: 'date_taken,views,o_dims'
+				}
+			});
+			return res.photoset;
 		}
-	});
-	return res.photoset;
+	);
 }

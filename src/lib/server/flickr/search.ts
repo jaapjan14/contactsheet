@@ -1,7 +1,9 @@
 import { flickr } from './client';
+import { wrap, key } from '$lib/server/cache';
 import type { PhotosPage } from './types';
 
 const DEFAULT_PER_PAGE = 100;
+const TTL = 60; // 1 minute — search results are dynamic but repeat-clicks should be free
 
 export type SearchSort =
 	| 'relevance'
@@ -42,9 +44,22 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 		params.tags = opts.tags;
 		params.tag_mode = 'all';
 	}
-	const res = await flickr<SearchResponse>({
-		method: 'flickr.photos.search',
-		params
-	});
-	return res.photos;
+	return wrap(
+		key('photos.search', {
+			text: opts.text,
+			user_id: opts.userId,
+			tags: opts.tags,
+			sort: opts.sort ?? 'relevance',
+			page: opts.page ?? 1,
+			per_page: opts.perPage ?? DEFAULT_PER_PAGE
+		}),
+		TTL,
+		async () => {
+			const res = await flickr<SearchResponse>({
+				method: 'flickr.photos.search',
+				params
+			});
+			return res.photos;
+		}
+	);
 }

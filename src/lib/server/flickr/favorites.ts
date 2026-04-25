@@ -1,9 +1,12 @@
 import { flickr } from './client';
 import { flickrAuth } from './authenticated';
 import { readAuth } from '$lib/server/auth/store';
+import { wrap, key } from '$lib/server/cache';
 import type { PhotosPage } from './types';
 
 const DEFAULT_PER_PAGE = 100;
+const TTL_PUBLIC = 5 * 60; // 5 minutes
+const TTL_OWN = 30; // 30 seconds — own faves are mutable
 
 interface FavesResponse {
 	stat: string;
@@ -29,25 +32,37 @@ export async function getUserFaves(
 	const isSelf = auth?.nsid === targetUserId;
 
 	if (isSelf) {
-		const res = await flickrAuth<FavesResponse>({
-			method: 'flickr.favorites.getList',
-			params: {
-				per_page: String(perPage),
-				page: String(page),
-				extras: FAVES_EXTRAS
+		return wrap(
+			key('favorites.getList', { user: auth!.nsid, page, per_page: perPage }),
+			TTL_OWN,
+			async () => {
+				const res = await flickrAuth<FavesResponse>({
+					method: 'flickr.favorites.getList',
+					params: {
+						per_page: String(perPage),
+						page: String(page),
+						extras: FAVES_EXTRAS
+					}
+				});
+				return res.photos;
 			}
-		});
-		return res.photos;
+		);
 	}
 
-	const res = await flickr<FavesResponse>({
-		method: 'flickr.favorites.getPublicList',
-		params: {
-			user_id: targetUserId,
-			per_page: String(perPage),
-			page: String(page),
-			extras: FAVES_EXTRAS
+	return wrap(
+		key('favorites.getPublicList', { user_id: targetUserId, page, per_page: perPage }),
+		TTL_PUBLIC,
+		async () => {
+			const res = await flickr<FavesResponse>({
+				method: 'flickr.favorites.getPublicList',
+				params: {
+					user_id: targetUserId,
+					per_page: String(perPage),
+					page: String(page),
+					extras: FAVES_EXTRAS
+				}
+			});
+			return res.photos;
 		}
-	});
-	return res.photos;
+	);
 }

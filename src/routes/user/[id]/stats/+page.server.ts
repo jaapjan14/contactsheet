@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
-import { flickr, FlickrError } from '$lib/server/flickr/client';
+import { FlickrError } from '$lib/server/flickr/client';
 import { resolveUserId } from '$lib/server/flickr/users';
+import { getPersonInfo } from '$lib/server/flickr/people';
 import { getTotalViews, getPopularPhotos } from '$lib/server/flickr/stats';
 import { readAuth } from '$lib/server/auth/store';
-import type { PeopleGetInfoResponse } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -24,10 +24,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw error(403, 'Stats are only viewable for your own account');
 	}
 
-	const info = await flickr<PeopleGetInfoResponse>({
-		method: 'flickr.people.getInfo',
-		params: { user_id: userId }
-	});
+	const user = await getPersonInfo(userId);
 
 	// Stats is a Pro-only feature. Try the calls and catch the permission error.
 	let totals = null;
@@ -55,7 +52,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	return {
 		userKey: params.id,
-		user: info.person,
+		user,
 		totals,
 		popular,
 		proRequired,
