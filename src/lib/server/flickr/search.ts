@@ -1,4 +1,4 @@
-import { flickr } from './client';
+import { flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type { PhotosPage } from './types';
 
@@ -57,7 +57,10 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 		}),
 		TTL,
 		async () => {
-			const res = await flickr<SearchResponse>({
+			// flickrMaybeSigned: Flickr ignores safe_search=3 on unsigned calls.
+			// Signing the call respects the param and the calling user's account
+			// content-level preferences (see flickr.com Settings > Privacy).
+			const res = await flickrMaybeSigned<SearchResponse>({
 				method: 'flickr.photos.search',
 				params
 			});
