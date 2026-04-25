@@ -1,4 +1,5 @@
 import { flickr } from './client';
+import { flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type {
 	PeopleGetInfoResponse,
@@ -30,12 +31,17 @@ export async function getUserPhotos(
 		key('people.getPhotos', { user_id: userId, page, per_page: perPage }),
 		TTL_PHOTOS,
 		async () => {
-			const res = await flickr<PeopleGetPhotosResponse>({
+			// Signed + safe_search=3: signed call so Flickr respects safe_search=3
+			// (otherwise quietly downgraded). Without this, users whose photos are
+			// rated moderate/restricted (artistic nudes, etc.) appear empty or
+			// with only their handful of safe-rated photos.
+			const res = await flickrMaybeSigned<PeopleGetPhotosResponse>({
 				method: 'flickr.people.getPhotos',
 				params: {
 					user_id: userId,
 					per_page: String(perPage),
 					page: String(page),
+					safe_search: '3',
 					extras: 'date_taken,views,o_dims'
 				}
 			});

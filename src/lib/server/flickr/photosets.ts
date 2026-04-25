@@ -1,3 +1,4 @@
+import { flickrMaybeSigned } from './authenticated';
 import { flickr } from './client';
 import { wrap, key } from '$lib/server/cache';
 import type {
@@ -42,7 +43,7 @@ export async function getAlbumPhotos(
 		key('photosets.getPhotos', { album_id: albumId, page, per_page: perPage }),
 		TTL_PHOTOS,
 		async () => {
-			const res = await flickr<PhotosetGetPhotosResponse>({
+			const res = await flickrMaybeSigned<PhotosetGetPhotosResponse>({
 				method: 'flickr.photosets.getPhotos',
 				params: {
 					photoset_id: albumId,
