@@ -17,3 +17,23 @@ export async function flickrAuth<T = unknown>(
 		token: { token: auth.access_token, secret: auth.access_token_secret }
 	});
 }
+
+/**
+ * Like flickr() but signs the call when auth is available, falls back to
+ * unsigned otherwise. Useful for endpoints that work unsigned for public
+ * resources but need authentication for private/members-only ones — Flickr
+ * groups, especially.
+ */
+export async function flickrMaybeSigned<T = unknown>(
+	opts: Omit<FlickrCallOptions, 'signed' | 'token'>
+): Promise<T> {
+	const auth = await readAuth();
+	if (auth) {
+		return flickr<T>({
+			...opts,
+			signed: true,
+			token: { token: auth.access_token, secret: auth.access_token_secret }
+		});
+	}
+	return flickr<T>(opts);
+}

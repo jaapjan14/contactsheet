@@ -1,5 +1,5 @@
 import { flickr } from './client';
-import { flickrAuth } from './authenticated';
+import { flickrAuth, flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type {
 	GroupsGetInfoResponse,
@@ -60,9 +60,15 @@ export async function resolveGroupId(input: string): Promise<string> {
 	});
 }
 
+/**
+ * Group info uses a maybe-signed call: some groups (private, members-only,
+ * 18+) require the viewer to be a member to read their info, in which case
+ * Flickr returns "Group not found" / "Permission denied" for unsigned
+ * requests. flickrMaybeSigned attaches Jacob's token if present.
+ */
 export async function getGroupInfo(groupId: string): Promise<FlickrGroupInfo> {
 	return wrap(key('groups.getInfo', { group_id: groupId }), TTL_INFO, async () => {
-		const res = await flickr<GroupsGetInfoResponse>({
+		const res = await flickrMaybeSigned<GroupsGetInfoResponse>({
 			method: 'flickr.groups.getInfo',
 			params: { group_id: groupId }
 		});
@@ -70,6 +76,11 @@ export async function getGroupInfo(groupId: string): Promise<FlickrGroupInfo> {
 	});
 }
 
+/**
+ * Group pool: same maybe-signed deal. Private pools require the caller to
+ * be a member; signed call lets Jacob read the pools of every group he
+ * belongs to. Non-member private pools still 4xx — handle gracefully in the route.
+ */
 export async function getGroupPhotos(
 	groupId: string,
 	page = 1,
@@ -79,7 +90,7 @@ export async function getGroupPhotos(
 		key('groups.pools.getPhotos', { group_id: groupId, page, per_page: perPage }),
 		TTL_POOL,
 		async () => {
-			const res = await flickr<GroupsPoolGetPhotosResponse>({
+			const res = await flickrMaybeSigned<GroupsPoolGetPhotosResponse>({
 				method: 'flickr.groups.pools.getPhotos',
 				params: {
 					group_id: groupId,

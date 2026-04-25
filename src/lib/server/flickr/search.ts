@@ -33,7 +33,9 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 		per_page: String(opts.perPage ?? DEFAULT_PER_PAGE),
 		page: String(opts.page ?? 1),
 		extras: 'date_taken,views,o_dims,owner_name,path_alias',
-		safe_search: '1',
+		// 3 = unrestricted (safe + moderate + restricted). ContactSheet is a
+		// personal tool — no need to filter adult content.
+		safe_search: '3',
 		content_type: '1',
 		media: 'photos',
 		sort: opts.sort ?? 'relevance'

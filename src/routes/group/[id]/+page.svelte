@@ -129,25 +129,31 @@
 	</div>
 </header>
 
-<div class="grid">
-	{#each photos as p (p.id)}
-		<a class="cell" href="/photo/{p.id}" title={p.title}>
-			<img
-				src={photoUrl(p, 'z')}
-				alt={p.title}
-				loading="lazy"
-				style="view-transition-name: photo-{p.id};"
-			/>
-		</a>
-	{/each}
-</div>
-
-{#if currentPage < totalPages}
-	<div class="sentinel" bind:this={sentinelEl} aria-hidden="true">
-		{#if loading}loading more…{/if}
+{#if data.poolError}
+	<p class="empty">
+		Can't view this group's pool — {data.poolError}.
+	</p>
+{:else}
+	<div class="grid">
+		{#each photos as p (p.id)}
+			<a class="cell" href="/photo/{p.id}" title={p.title}>
+				<img
+					src={photoUrl(p, 'z')}
+					alt={p.title}
+					loading="lazy"
+					style="view-transition-name: photo-{p.id};"
+				/>
+			</a>
+		{/each}
 	</div>
-{:else if photos.length > 0}
-	<div class="end">end of pool · {photos.length.toLocaleString()} photos loaded</div>
+
+	{#if currentPage < totalPages}
+		<div class="sentinel" bind:this={sentinelEl} aria-hidden="true">
+			{#if loading}loading more…{/if}
+		</div>
+	{:else if photos.length > 0}
+		<div class="end">end of pool · {photos.length.toLocaleString()} photos loaded</div>
+	{/if}
 {/if}
 
 <style>
@@ -225,11 +231,17 @@
 		transform: scale(1.04);
 	}
 	.sentinel,
-	.end {
+	.end,
+	.empty {
 		text-align: center;
 		font-family: var(--font-mono);
-		font-size: 0.78rem;
+		font-size: 0.85rem;
 		color: var(--fg-muted);
-		padding: 2rem 0 4rem;
+		padding: 2rem 1.5rem 4rem;
+		max-width: 80rem;
+		margin: 0 auto;
+	}
+	.empty {
+		font-size: 0.9rem;
 	}
 </style>

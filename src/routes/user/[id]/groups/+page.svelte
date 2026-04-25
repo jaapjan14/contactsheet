@@ -62,7 +62,6 @@
 						<span class="name">{g.displayName}</span>
 						{#if g.admin}<span class="role admin">admin</span>{/if}
 						{#if g.invitation_only}<span class="role invite">invite-only</span>{/if}
-						{#if g.eighteenplus}<span class="role nsfw">18+</span>{/if}
 					</a>
 				</li>
 			{/each}
@@ -170,10 +169,6 @@
 	.role.admin {
 		color: var(--accent);
 		border-color: var(--accent);
-	}
-	.role.nsfw {
-		color: #d96a6a;
-		border-color: #5a3030;
 	}
 	.empty {
 		text-align: center;
