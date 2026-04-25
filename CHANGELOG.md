@@ -138,3 +138,19 @@
   `/share/ProgramData-vol5/Containers/contactsheet/` (mirrors Darkroom Log's
   layout). README has the rsync + paste-into-Container-Station flow.
   Image still builds on the NAS from source — no Docker Hub push required.
+- **Security headers**, configured for going public:
+  - **CSP** in `svelte.config.js` with `mode: 'auto'` — SvelteKit auto-adds
+    nonces to its hydration scripts. Locked-down `default-src 'self'`,
+    `frame-ancestors 'none'`, `object-src 'none'`. `style-src` keeps
+    `'unsafe-inline'` because the lightbox morph relies on
+    `style="view-transition-name: photo-{id}"` attributes (photo IDs are
+    numeric Flickr IDs, no user-controlled content reaches a style attribute).
+    `img-src` allows `*.staticflickr.com` and `data:`, `font-src` allows
+    Google Fonts (IBM Plex). `form-action` allows the OAuth POST to flickr.com.
+  - **`src/hooks.server.ts`** sets the rest: `X-Content-Type-Options: nosniff`,
+    `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`,
+    `Permissions-Policy` denying camera/mic/geo/etc., `Cross-Origin-Opener-Policy:
+    same-origin`. `Strict-Transport-Security` is conditionally set when the
+    incoming request is HTTPS (checked via `x-forwarded-proto` so Cloudflare
+    Tunnel HTTPS termination is honored even though cloudflared talks to the
+    container over HTTP inside the NAS).
