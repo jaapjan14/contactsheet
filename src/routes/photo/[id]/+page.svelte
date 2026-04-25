@@ -22,6 +22,7 @@
 		if (streamCtx.albumId) return 'album';
 		if (streamCtx.groupId) return 'group';
 		if (streamCtx.galleryId) return 'gallery';
+		if (streamCtx.searchPath) return 'search results';
 		const map: Record<string, string> = {
 			photostream: 'photostream',
 			albums: 'albums',
@@ -135,10 +136,11 @@
 	}
 
 	type StreamCtx =
-		| { ids: string[]; userKey: string; tab: string; albumId?: undefined; groupId?: undefined; galleryId?: undefined }
-		| { ids: string[]; albumId: string; tab: 'album'; userKey?: undefined; groupId?: undefined; galleryId?: undefined }
-		| { ids: string[]; groupId: string; tab: 'group'; userKey?: undefined; albumId?: undefined; galleryId?: undefined }
-		| { ids: string[]; galleryId: string; tab: 'gallery'; userKey?: undefined; albumId?: undefined; groupId?: undefined };
+		| { ids: string[]; userKey: string; tab: string; albumId?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined }
+		| { ids: string[]; albumId: string; tab: 'album'; userKey?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined }
+		| { ids: string[]; groupId: string; tab: 'group'; userKey?: undefined; albumId?: undefined; galleryId?: undefined; searchPath?: undefined }
+		| { ids: string[]; galleryId: string; tab: 'gallery'; userKey?: undefined; albumId?: undefined; groupId?: undefined; searchPath?: undefined }
+		| { ids: string[]; searchPath: string; tab: 'search'; userKey?: undefined; albumId?: undefined; groupId?: undefined; galleryId?: undefined };
 
 	let streamCtx = $state<StreamCtx | null>(null);
 	let position = $derived(streamCtx ? streamCtx.ids.indexOf(photo.id) : -1);
@@ -156,7 +158,9 @@
 					? `/group/${streamCtx.groupId}`
 					: streamCtx.galleryId
 						? `/gallery/${streamCtx.galleryId}`
-						: `/user/${streamCtx.userKey}/${streamCtx.tab}`
+						: streamCtx.searchPath
+							? streamCtx.searchPath
+							: `/user/${streamCtx.userKey}/${streamCtx.tab}`
 			: ownerHref
 	);
 

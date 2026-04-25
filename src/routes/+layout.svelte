@@ -27,6 +27,15 @@
 <header>
 	<a href="/" class="brand">ContactSheet</a>
 	<span class="tagline">a contact sheet for Flickr</span>
+	<form class="search" method="get" action="/search" role="search">
+		<input
+			name="q"
+			type="search"
+			placeholder="Search Flickr…"
+			autocomplete="off"
+			aria-label="Search"
+		/>
+	</form>
 	<span class="spacer"></span>
 	{#if data.me}
 		<a href="/user/{data.me.username}/photostream" class="me">
@@ -91,6 +100,26 @@
 	}
 	.spacer {
 		flex: 1;
+	}
+	.search {
+		margin: 0 0 0 0.5rem;
+		display: flex;
+	}
+	.search input {
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		color: var(--fg);
+		padding: 0.4rem 0.7rem;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		border-radius: 3px;
+		outline: none;
+		width: 14rem;
+		max-width: 30vw;
+	}
+	.search input:focus {
+		border-color: var(--accent);
+		width: 18rem;
 	}
 	.me,
 	.signin,

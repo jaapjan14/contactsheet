@@ -221,3 +221,12 @@
   our grids. With `replaceState` on arrow paging + `history.back()` on close,
   closing the lightbox now consistently drops you back at the exact thumbnail
   in the grid, regardless of how many photos you arrowed through.
+- **Search**: top-level search at `/search` (global Flickr) plus a header
+  search input always available. Query params are `q` (text), `user` (resolved
+  to NSID via `resolveUserId`, restricting results to that user's photos),
+  `tags` (comma-separated, ANDed via `tag_mode=all`), `sort` (relevance /
+  newest / oldest / recently-taken / earliest-taken / most-interesting / least-
+  interesting). Backed by `flickr.photos.search`, no OAuth required. Same
+  paginated infinite-scroll grid pattern as the rest of the app, JSON endpoint
+  at `/api/search/photos`. Lightbox stream context now also accepts
+  `{ searchPath, tab: 'search' }` so closing returns to the same query.
