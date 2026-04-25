@@ -48,6 +48,7 @@ export async function getAlbumPhotos(
 					photoset_id: albumId,
 					per_page: String(perPage),
 					page: String(page),
+					safe_search: '3',
 					extras: 'date_taken,views,o_dims'
 				}
 			});

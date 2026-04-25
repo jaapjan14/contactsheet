@@ -59,6 +59,7 @@ export async function getUserFaves(
 					user_id: targetUserId,
 					per_page: String(perPage),
 					page: String(page),
+					safe_search: '3',
 					extras: FAVES_EXTRAS
 				}
 			});

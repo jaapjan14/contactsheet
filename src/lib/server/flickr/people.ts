@@ -36,6 +36,7 @@ export async function getUserPhotos(
 					user_id: userId,
 					per_page: String(perPage),
 					page: String(page),
+					safe_search: '3',
 					extras: 'date_taken,views,o_dims'
 				}
 			});
