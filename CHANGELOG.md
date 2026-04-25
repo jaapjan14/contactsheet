@@ -268,3 +268,17 @@
   - Cold-vs-warm timing: 421ms → 14ms on `/user/lakatua/photostream`
     (~30× faster on repeat visits). Cache db persists in the existing
     `/app/data` volume, gitignored.
+- **Like / unlike a photo**: heart button on the lightbox figure (♡ outline /
+  ♥ filled, accent color when faved). Visible only when signed in.
+  Optimistic toggle with rollback on failure. Server-side
+  `POST/DELETE /api/photo/[id]/fave` calls `flickr.favorites.add` /
+  `.remove` and folds Flickr's "already faved" / "not in faves" error
+  codes into success so first-click flips the visible state correctly
+  regardless of prior state. Invalidates the user's own-faves cache so
+  `/user/.../faves` reflects the change on next visit.
+- **Add a comment**: textarea + Post button at the bottom of the comments
+  section, visible only when signed in. Optimistic append on success
+  (the new comment shows up instantly with the current user's name and
+  the current timestamp). `POST /api/photo/[id]/comments` calls
+  `flickr.photos.comments.addComment` and invalidates that photo's
+  cached comment list so the next reload pulls the canonical entry.

@@ -55,6 +55,82 @@
 	let saving = $state(false);
 	let saveError: string | null = $state(null);
 
+	// Like/unlike — initial state defaults to "not faved"; the toggle is
+	// intent-based, the server folds Flickr's "already faved" / "not faved"
+	// errors into success so the first click flips the visible state correctly.
+	let faved = $state(false);
+	let faving = $state(false);
+
+	// Comment compose + live comment list (initialized from server data,
+	// updated optimistically on submit so the user sees their comment immediately).
+	let liveComments = $state(untrack(() => data.comments));
+	let commentDraft = $state('');
+	let posting = $state(false);
+	let commentError: string | null = $state(null);
+
+	let lastCommentPhotoId = $state(untrack(() => data.photo.id));
+	$effect(() => {
+		if (data.photo.id !== lastCommentPhotoId) {
+			lastCommentPhotoId = data.photo.id;
+			liveComments = data.comments;
+			commentDraft = '';
+			faved = false;
+		}
+	});
+
+	async function toggleFave() {
+		if (faving || !data.me) return;
+		const wasFaved = faved;
+		faving = true;
+		faved = !wasFaved; // optimistic
+		try {
+			const res = await fetch(`/api/photo/${photo.id}/fave`, {
+				method: wasFaved ? 'DELETE' : 'POST'
+			});
+			if (!res.ok) throw new Error(await res.text());
+		} catch (err) {
+			faved = wasFaved; // rollback
+			console.error('fave toggle failed', err);
+		} finally {
+			faving = false;
+		}
+	}
+
+	async function submitComment(e: SubmitEvent) {
+		e.preventDefault();
+		const text = commentDraft.trim();
+		if (!text || posting || !data.me) return;
+		posting = true;
+		commentError = null;
+		try {
+			const res = await fetch(`/api/photo/${photo.id}/comments`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ text })
+			});
+			if (!res.ok) throw new Error(await res.text());
+			const { commentId } = (await res.json()) as { commentId: string };
+			liveComments = [
+				...liveComments,
+				{
+					id: commentId,
+					author: data.me.nsid,
+					authorname: data.me.username,
+					realname: data.me.fullname || data.me.username,
+					datecreate: String(Math.floor(Date.now() / 1000)),
+					permalink: '',
+					_content: text,
+					path_alias: data.me.username
+				}
+			];
+			commentDraft = '';
+		} catch (err) {
+			commentError = (err as Error).message;
+		} finally {
+			posting = false;
+		}
+	}
+
 	function startEditTitle() {
 		titleDraft = liveTitle;
 		editingTitle = true;
@@ -360,6 +436,19 @@
 		{#if streamCtx && position >= 0}
 			<span class="counter">{position + 1} / {streamCtx.ids.length}</span>
 		{/if}
+		{#if data.me}
+			<button
+				type="button"
+				class="iconbtn fave"
+				class:active={faved}
+				onclick={toggleFave}
+				disabled={faving}
+				aria-label={faved ? 'Remove from faves' : 'Add to faves'}
+				title={faved ? 'Faved' : 'Add to faves'}
+			>
+				{faved ? '♥' : '♡'}
+			</button>
+		{/if}
 		<button
 			type="button"
 			class="iconbtn full"
@@ -513,20 +602,43 @@
 			</section>
 		{/if}
 
-		{#if data.comments.length > 0}
+		{#if liveComments.length > 0 || data.me}
 			<section class="comments">
-				<h3>Comments ({data.comments.length})</h3>
-				{#each data.comments as c (c.id)}
-					<article class="comment">
-						<header>
-							<a href="/user/{c.path_alias || c.author}/photostream">
-								{c.realname || c.authorname}
-							</a>
-							<time>{formatCommentDate(c.datecreate)}</time>
-						</header>
-						<p>{decodeAndStripHtml(c._content)}</p>
-					</article>
-				{/each}
+				{#if liveComments.length > 0}
+					<h3>Comments ({liveComments.length})</h3>
+					{#each liveComments as c (c.id)}
+						<article class="comment">
+							<header>
+								<a href="/user/{c.path_alias || c.author}/photostream">
+									{c.realname || c.authorname}
+								</a>
+								<time>{formatCommentDate(c.datecreate)}</time>
+							</header>
+							<p>{decodeAndStripHtml(c._content)}</p>
+						</article>
+					{/each}
+				{:else}
+					<h3>Comments</h3>
+					<p class="empty-comments">Be the first to comment.</p>
+				{/if}
+
+				{#if data.me}
+					<form class="comment-form" onsubmit={submitComment}>
+						<textarea
+							bind:value={commentDraft}
+							placeholder="Add a comment as {data.me.fullname || data.me.username}…"
+							rows="3"
+						></textarea>
+						<div class="comment-actions">
+							<button type="submit" class="btn primary" disabled={!commentDraft.trim() || posting}>
+								{posting ? 'posting…' : 'post'}
+							</button>
+							{#if commentError}
+								<span class="save-error">{commentError}</span>
+							{/if}
+						</div>
+					</form>
+				{/if}
 			</section>
 		{/if}
 
@@ -628,6 +740,18 @@
 	}
 	.iconbtn.full {
 		right: 3.2rem;
+	}
+	.iconbtn.fave {
+		right: 5.8rem;
+		font-size: 1.1rem;
+		line-height: 1;
+	}
+	.iconbtn.fave.active {
+		color: var(--accent);
+	}
+	.iconbtn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	.iconbtn:focus-visible {
 		outline: 2px solid var(--accent);
@@ -906,6 +1030,39 @@
 		line-height: 1.45;
 		color: #c8c8c8;
 		white-space: pre-wrap;
+	}
+	.empty-comments {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--fg-muted);
+		margin: 0 0 0.75rem;
+	}
+	.comment-form {
+		margin-top: 0.75rem;
+	}
+	.comment-form textarea {
+		width: 100%;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		color: var(--fg);
+		padding: 0.55rem 0.65rem;
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		line-height: 1.45;
+		border-radius: 3px;
+		outline: none;
+		resize: vertical;
+		min-height: 4rem;
+		box-sizing: border-box;
+	}
+	.comment-form textarea:focus {
+		border-color: var(--accent);
+	}
+	.comment-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
 	}
 	.links {
 		font-family: var(--font-mono);
