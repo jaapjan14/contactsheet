@@ -32,14 +32,16 @@ services:
       # Host:container. NAS 3416 is darkroom, 3417 is piwigo — using 3418.
       - '3418:3000'
 
-    environment:
-      FLICKR_API_KEY: ${FLICKR_API_KEY}
-      FLICKR_API_SECRET: ${FLICKR_API_SECRET}
-      # ORIGIN must match the URL the app is reached at. SvelteKit uses it for
-      # form-action and OAuth-callback origin checks. Pick whichever applies:
-      #   - LAN only:        http://192.168.0.199:3418
-      #   - Cloudflare tunnel: https://contactsheet.jjlnas.com
-      ORIGIN: ${CONTACTSHEET_ORIGIN:-http://192.168.0.199:3418}
+    # `env_file` actually injects the values into the container — Container
+    # Station does not auto-parse .env for `${VAR}` substitution in the compose
+    # itself, which is why the previous version blew up with a 500 at /auth/start.
+    # The .env on the NAS must contain:
+    #   FLICKR_API_KEY=...
+    #   FLICKR_API_SECRET=...
+    #   ORIGIN=http://192.168.0.199:3418     (LAN testing)
+    #   # or ORIGIN=https://contactsheet.jjlnas.com  (Cloudflare tunnel later)
+    env_file:
+      - .env
 
     volumes:
       # Persists the OAuth token (data/auth.json) across image rebuilds.
