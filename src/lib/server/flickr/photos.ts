@@ -14,6 +14,7 @@ const TTL_INFO = 7 * 24 * 60 * 60; // 7 days
 const TTL_SIZES = 7 * 24 * 60 * 60;
 const TTL_EXIF = 30 * 24 * 60 * 60; // 30 days — EXIF doesn't change once uploaded
 const TTL_COMMENTS = 60; // 1 minute — comments are mutable
+const TTL_FAVES = 60; // 1 minute — fave count is mutable
 
 export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
 	return wrap(key('photos.getInfo', { photo_id: photoId }), TTL_INFO, async () => {
@@ -68,6 +69,30 @@ export async function getPhotoComments(photoId: string): Promise<FlickrComment[]
 			return res.comments.comment ?? [];
 		} catch (err) {
 			if (err instanceof FlickrError) return [];
+			throw err;
+		}
+	});
+}
+
+interface FavoritesCountResponse {
+	stat: string;
+	photo: { total: number | string; page: number; pages: number };
+}
+
+/**
+ * Just the fave count for a photo — `flickr.photos.getInfo` doesn't include it,
+ * so we hit `getFavorites` with per_page=1 and read `total`.
+ */
+export async function getPhotoFavoritesCount(photoId: string): Promise<number> {
+	return wrap(key('photos.favoritesCount', { photo_id: photoId }), TTL_FAVES, async () => {
+		try {
+			const res = await flickr<FavoritesCountResponse>({
+				method: 'flickr.photos.getFavorites',
+				params: { photo_id: photoId, per_page: '1' }
+			});
+			return Number(res.photo.total) || 0;
+		} catch (err) {
+			if (err instanceof FlickrError) return 0;
 			throw err;
 		}
 	});

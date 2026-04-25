@@ -4,7 +4,8 @@ import {
 	getPhotoInfo,
 	getPhotoSizes,
 	getPhotoExif,
-	getPhotoComments
+	getPhotoComments,
+	getPhotoFavoritesCount
 } from '$lib/server/flickr/photos';
 import type { FlickrSizeEntry } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
@@ -21,11 +22,12 @@ function pickDisplaySize(sizes: FlickrSizeEntry[]): FlickrSizeEntry | null {
 
 export const load: PageServerLoad = async ({ params }) => {
 	try {
-		const [photo, sizes, exif, comments] = await Promise.all([
+		const [photo, sizes, exif, comments, favesCount] = await Promise.all([
 			getPhotoInfo(params.id),
 			getPhotoSizes(params.id),
 			getPhotoExif(params.id),
-			getPhotoComments(params.id)
+			getPhotoComments(params.id),
+			getPhotoFavoritesCount(params.id)
 		]);
 
 		const display = pickDisplaySize(sizes);
@@ -35,7 +37,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			photo,
 			display,
 			exif,
-			comments
+			comments,
+			favesCount
 		};
 	} catch (err) {
 		if (err instanceof FlickrError) {

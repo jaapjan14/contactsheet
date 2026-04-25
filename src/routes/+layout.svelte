@@ -33,6 +33,7 @@
 <header>
 	<a href="/" class="brand">ContactSheet</a>
 	<span class="tagline">a contact sheet for Flickr</span>
+	<a href="/explore" class="nav-link">Explore</a>
 	<form class="search" method="get" action="/search" role="search">
 		<input
 			name="q"
@@ -103,6 +104,16 @@
 		color: var(--fg-muted);
 		font-size: 0.8rem;
 		font-family: var(--font-mono);
+	}
+	.nav-link {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--fg-muted);
+		margin-left: 0.5rem;
+	}
+	.nav-link:hover {
+		color: var(--fg);
+		text-decoration: none;
 	}
 	.spacer {
 		flex: 1;

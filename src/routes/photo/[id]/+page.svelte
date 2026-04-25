@@ -23,6 +23,7 @@
 		if (streamCtx.groupId) return 'group';
 		if (streamCtx.galleryId) return 'gallery';
 		if (streamCtx.searchPath) return 'search results';
+		if (streamCtx.explorePath) return 'Explore';
 		const map: Record<string, string> = {
 			photostream: 'photostream',
 			albums: 'albums',
@@ -60,6 +61,7 @@
 	// errors into success so the first click flips the visible state correctly.
 	let faved = $state(false);
 	let faving = $state(false);
+	let faveCount = $state(untrack(() => data.favesCount));
 
 	// Comment compose + live comment list (initialized from server data,
 	// updated optimistically on submit so the user sees their comment immediately).
@@ -75,6 +77,7 @@
 			liveComments = data.comments;
 			commentDraft = '';
 			faved = false;
+			faveCount = data.favesCount;
 		}
 	});
 
@@ -83,6 +86,7 @@
 		const wasFaved = faved;
 		faving = true;
 		faved = !wasFaved; // optimistic
+		faveCount = Math.max(0, faveCount + (wasFaved ? -1 : 1));
 		try {
 			const res = await fetch(`/api/photo/${photo.id}/fave`, {
 				method: wasFaved ? 'DELETE' : 'POST'
@@ -90,6 +94,7 @@
 			if (!res.ok) throw new Error(await res.text());
 		} catch (err) {
 			faved = wasFaved; // rollback
+			faveCount = Math.max(0, faveCount + (wasFaved ? 1 : -1));
 			console.error('fave toggle failed', err);
 		} finally {
 			faving = false;
@@ -212,11 +217,12 @@
 	}
 
 	type StreamCtx =
-		| { ids: string[]; userKey: string; tab: string; albumId?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined }
-		| { ids: string[]; albumId: string; tab: 'album'; userKey?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined }
-		| { ids: string[]; groupId: string; tab: 'group'; userKey?: undefined; albumId?: undefined; galleryId?: undefined; searchPath?: undefined }
-		| { ids: string[]; galleryId: string; tab: 'gallery'; userKey?: undefined; albumId?: undefined; groupId?: undefined; searchPath?: undefined }
-		| { ids: string[]; searchPath: string; tab: 'search'; userKey?: undefined; albumId?: undefined; groupId?: undefined; galleryId?: undefined };
+		| { ids: string[]; userKey: string; tab: string; albumId?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined; explorePath?: undefined }
+		| { ids: string[]; albumId: string; tab: 'album'; userKey?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined; explorePath?: undefined }
+		| { ids: string[]; groupId: string; tab: 'group'; userKey?: undefined; albumId?: undefined; galleryId?: undefined; searchPath?: undefined; explorePath?: undefined }
+		| { ids: string[]; galleryId: string; tab: 'gallery'; userKey?: undefined; albumId?: undefined; groupId?: undefined; searchPath?: undefined; explorePath?: undefined }
+		| { ids: string[]; searchPath: string; tab: 'search'; userKey?: undefined; albumId?: undefined; groupId?: undefined; galleryId?: undefined; explorePath?: undefined }
+		| { ids: string[]; explorePath: string; tab: 'explore'; userKey?: undefined; albumId?: undefined; groupId?: undefined; galleryId?: undefined; searchPath?: undefined };
 
 	let streamCtx = $state<StreamCtx | null>(null);
 	let position = $derived(streamCtx ? streamCtx.ids.indexOf(photo.id) : -1);
@@ -236,7 +242,9 @@
 						? `/gallery/${streamCtx.galleryId}`
 						: streamCtx.searchPath
 							? streamCtx.searchPath
-							: `/user/${streamCtx.userKey}/${streamCtx.tab}`
+							: streamCtx.explorePath
+								? streamCtx.explorePath
+								: `/user/${streamCtx.userKey}/${streamCtx.tab}`
 			: ownerHref
 	);
 
@@ -499,6 +507,9 @@
 			by <a href={ownerHref}>{ownerName}</a>
 			{#if photo.dates.taken} · <time>{photo.dates.taken.split(' ')[0]}</time>{/if}
 			{#if photo.views} · {Number(photo.views).toLocaleString()} views{/if}
+			· {faveCount.toLocaleString()} {faveCount === 1 ? 'fave' : 'faves'}
+			{#if liveComments.length > 0} · {liveComments.length}
+				{liveComments.length === 1 ? 'comment' : 'comments'}{/if}
 		</p>
 
 		{#if editingDesc}
