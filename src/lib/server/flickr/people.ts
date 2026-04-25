@@ -1,5 +1,4 @@
 import { flickr } from './client';
-import { flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type {
 	PeopleGetInfoResponse,
@@ -31,13 +30,12 @@ export async function getUserPhotos(
 		key('people.getPhotos', { user_id: userId, page, per_page: perPage }),
 		TTL_PHOTOS,
 		async () => {
-			const res = await flickrMaybeSigned<PeopleGetPhotosResponse>({
+			const res = await flickr<PeopleGetPhotosResponse>({
 				method: 'flickr.people.getPhotos',
 				params: {
 					user_id: userId,
 					per_page: String(perPage),
 					page: String(page),
-					safe_search: '3',
 					extras: 'date_taken,views,o_dims'
 				}
 			});

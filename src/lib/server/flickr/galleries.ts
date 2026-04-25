@@ -1,5 +1,4 @@
 import { flickr } from './client';
-import { flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type {
 	GalleriesGetListResponse,
@@ -56,13 +55,12 @@ export async function getGalleryPhotos(
 		key('galleries.getPhotos', { gallery_id: galleryId, page, per_page: perPage }),
 		TTL_PHOTOS,
 		async () => {
-			const res = await flickrMaybeSigned<GalleriesGetPhotosResponse>({
+			const res = await flickr<GalleriesGetPhotosResponse>({
 				method: 'flickr.galleries.getPhotos',
 				params: {
 					gallery_id: galleryId,
 					per_page: String(perPage),
 					page: String(page),
-					safe_search: '3',
 					extras: 'date_taken,views,o_dims,owner_name'
 				}
 			});

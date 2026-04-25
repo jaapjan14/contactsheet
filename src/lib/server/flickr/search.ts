@@ -37,10 +37,11 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 		// reason to filter adult content. Requires a signed call to take effect
 		// (Flickr silently downgrades unsigned restricted requests).
 		safe_search: '3',
-		// content_type=7 = photos + screenshots + other; media=all = include
-		// videos. Matches what Flickr.com's own search returns by default.
+		// content_type=7 = photos + screenshots + illustrations. media=photos
+		// excludes videos because /photo/[id] is built to render still images
+		// only — clicking a video would 404 in the lightbox.
 		content_type: '7',
-		media: 'all',
+		media: 'photos',
 		sort: opts.sort ?? 'relevance'
 	};
 	if (opts.text) params.text = opts.text;

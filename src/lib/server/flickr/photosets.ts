@@ -1,5 +1,4 @@
 import { flickr } from './client';
-import { flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type {
 	PhotosetsGetListResponse,
@@ -43,13 +42,12 @@ export async function getAlbumPhotos(
 		key('photosets.getPhotos', { album_id: albumId, page, per_page: perPage }),
 		TTL_PHOTOS,
 		async () => {
-			const res = await flickrMaybeSigned<PhotosetGetPhotosResponse>({
+			const res = await flickr<PhotosetGetPhotosResponse>({
 				method: 'flickr.photosets.getPhotos',
 				params: {
 					photoset_id: albumId,
 					per_page: String(perPage),
 					page: String(page),
-					safe_search: '3',
 					extras: 'date_taken,views,o_dims'
 				}
 			});

@@ -1,4 +1,5 @@
-import { flickr, FlickrError } from './client';
+import { FlickrError } from './client';
+import { flickrMaybeSigned } from './authenticated';
 import { wrap, key, get as cacheGet, set as cacheSet } from '$lib/server/cache';
 import type {
 	PhotosGetInfoResponse,
@@ -18,7 +19,7 @@ const TTL_FAVES = 60; // 1 minute — fave count is mutable
 
 export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
 	return wrap(key('photos.getInfo', { photo_id: photoId }), TTL_INFO, async () => {
-		const res = await flickr<PhotosGetInfoResponse>({
+		const res = await flickrMaybeSigned<PhotosGetInfoResponse>({
 			method: 'flickr.photos.getInfo',
 			params: { photo_id: photoId }
 		});
@@ -28,7 +29,7 @@ export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
 
 export async function getPhotoSizes(photoId: string): Promise<FlickrSizeEntry[]> {
 	return wrap(key('photos.getSizes', { photo_id: photoId }), TTL_SIZES, async () => {
-		const res = await flickr<PhotosGetSizesResponse>({
+		const res = await flickrMaybeSigned<PhotosGetSizesResponse>({
 			method: 'flickr.photos.getSizes',
 			params: { photo_id: photoId }
 		});
@@ -47,7 +48,7 @@ export async function getPhotoExif(
 	const cached = cacheGet<PhotosGetExifResponse['photo']>(k);
 	if (cached) return cached;
 	try {
-		const res = await flickr<PhotosGetExifResponse>({
+		const res = await flickrMaybeSigned<PhotosGetExifResponse>({
 			method: 'flickr.photos.getExif',
 			params: { photo_id: photoId }
 		});
@@ -62,7 +63,7 @@ export async function getPhotoExif(
 export async function getPhotoComments(photoId: string): Promise<FlickrComment[]> {
 	return wrap(key('photos.comments', { photo_id: photoId }), TTL_COMMENTS, async () => {
 		try {
-			const res = await flickr<PhotosCommentsGetListResponse>({
+			const res = await flickrMaybeSigned<PhotosCommentsGetListResponse>({
 				method: 'flickr.photos.comments.getList',
 				params: { photo_id: photoId }
 			});
@@ -86,7 +87,7 @@ interface FavoritesCountResponse {
 export async function getPhotoFavoritesCount(photoId: string): Promise<number> {
 	return wrap(key('photos.favoritesCount', { photo_id: photoId }), TTL_FAVES, async () => {
 		try {
-			const res = await flickr<FavoritesCountResponse>({
+			const res = await flickrMaybeSigned<FavoritesCountResponse>({
 				method: 'flickr.photos.getFavorites',
 				params: { photo_id: photoId, per_page: '1' }
 			});

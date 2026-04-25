@@ -1,4 +1,5 @@
-import { flickrAuth, flickrMaybeSigned } from './authenticated';
+import { flickr } from './client';
+import { flickrAuth } from './authenticated';
 import { readAuth } from '$lib/server/auth/store';
 import { wrap, key } from '$lib/server/cache';
 import type { PhotosPage } from './types';
@@ -52,13 +53,12 @@ export async function getUserFaves(
 		key('favorites.getPublicList', { user_id: targetUserId, page, per_page: perPage }),
 		TTL_PUBLIC,
 		async () => {
-			const res = await flickrMaybeSigned<FavesResponse>({
+			const res = await flickr<FavesResponse>({
 				method: 'flickr.favorites.getPublicList',
 				params: {
 					user_id: targetUserId,
 					per_page: String(perPage),
 					page: String(page),
-					safe_search: '3',
 					extras: FAVES_EXTRAS
 				}
 			});
