@@ -46,7 +46,9 @@ services:
     #   ORIGIN=http://192.168.0.199:3418     (LAN testing)
     #   # or ORIGIN=https://contactsheet.jjlnas.com  (Cloudflare tunnel later)
     env_file:
-      - .env
+      # Absolute path required: Container Station validates YAML from /tmp,
+      # so a relative `.env` resolves to /tmp/.env and fails.
+      - /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet/.env
 
     volumes:
       # Persists the OAuth token (data/auth.json) across image rebuilds.
