@@ -54,15 +54,19 @@ Use `docker-compose.qnap.yml`. The convention mirrors Darkroom Log:
 
 ```sh
 # from the dev machine, sync source to NAS
+# IMPORTANT: --exclude=.env so the NAS-specific .env (which has the
+# tunnel ORIGIN, etc.) is never clobbered by your local dev .env.
 rsync -av --delete \
-    --exclude node_modules --exclude .svelte-kit --exclude build --exclude data --exclude .git \
+    --exclude node_modules --exclude .svelte-kit --exclude build --exclude data \
+    --exclude .git --exclude .env \
     ./ jtalakua@192.168.0.199:/share/ProgramData-vol5/Containers/contactsheet/
 
-# on the NAS, place secrets next to the compose file
+# on the NAS, place secrets next to the compose file (one-time)
 ssh -p 1056 jtalakua@192.168.0.199 \
     'cat > /share/ProgramData-vol5/Containers/contactsheet/.env <<EOF
 FLICKR_API_KEY=...
 FLICKR_API_SECRET=...
+ORIGIN=https://contactsheet.jjlnas.com
 EOF'
 ```
 
