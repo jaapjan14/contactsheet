@@ -53,3 +53,13 @@ services:
     volumes:
       # Persists the OAuth token (data/auth.json) across image rebuilds.
       - /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet/data:/app/data
+
+    networks:
+      # Same bridge cloudflared lives on, matching Darkroom Log's pattern.
+      # The Cloudflare tunnel ingress can then route to http://contactsheet:3000
+      # by container DNS instead of going through the host LAN IP + 3418.
+      - scoobydoo
+
+networks:
+  scoobydoo:
+    external: true
