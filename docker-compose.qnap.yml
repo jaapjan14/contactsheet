@@ -24,9 +24,11 @@
 
 services:
   contactsheet:
-    build:
-      context: /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet
-      dockerfile: Dockerfile
+    # Image is built outside Container Station via SSH:
+    #   ssh -p 1056 jtalakua@192.168.0.199
+    #   /share/CACHEDEV5_DATA/.qpkg/container-station/bin/docker build \
+    #     -t contactsheet:local /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet
+    # (Container Station rejects compose `build:` blocks during app validation.)
     image: contactsheet:local
     container_name: contactsheet
     restart: unless-stopped
