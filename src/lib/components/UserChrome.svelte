@@ -6,21 +6,35 @@
 		user,
 		userKey,
 		activeTab,
-		subtitle
+		subtitle,
+		isSelf = false
 	}: {
 		user: FlickrPersonInfo;
 		userKey: string;
 		activeTab: string;
 		subtitle: string;
+		isSelf?: boolean;
 	} = $props();
 
-	const tabs = [
+	interface Tab {
+		slug: string;
+		label: string;
+		disabled?: boolean;
+	}
+
+	const tabs = $derived<Tab[]>([
 		{ slug: 'photostream', label: 'Photostream' },
 		{ slug: 'albums', label: 'Albums' },
-		{ slug: 'faves', label: 'Faves', disabled: true },
+		{ slug: 'faves', label: 'Faves' },
 		{ slug: 'galleries', label: 'Galleries', disabled: true },
-		{ slug: 'groups', label: 'Groups', disabled: true }
-	];
+		{ slug: 'groups', label: 'Groups', disabled: true },
+		...(isSelf
+			? [
+					{ slug: 'camera-roll', label: 'Camera Roll' },
+					{ slug: 'stats', label: 'Stats' }
+				]
+			: [])
+	]);
 </script>
 
 <header class="user-header">

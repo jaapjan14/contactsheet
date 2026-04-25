@@ -154,3 +154,26 @@
     incoming request is HTTPS (checked via `x-forwarded-proto` so Cloudflare
     Tunnel HTTPS termination is honored even though cloudflared talks to the
     container over HTTP inside the NAS).
+- **Faves tab**: `/user/[id]/faves` paginated grid. Signed
+  `flickr.favorites.getList` when viewer == target (returns own private + public
+  faves), unsigned `flickr.favorites.getPublicList` otherwise. JSON pagination
+  endpoint at `/api/user/[id]/faves`. Empty-state message for users with no
+  public faves. Lightbox stream context tagged `tab: 'faves'` so close-button
+  returns to the right grid.
+- **Camera Roll tab**: `/user/[id]/camera-roll` — date-grouped variant of the
+  photostream. Photos bucketed by `datetaken` month (e.g. "April 2026"), each
+  bucket prefaced by a header with the count, infinite-scroll appends to the
+  same buckets. Shown in the user nav only when viewing your own profile.
+- **Stats tab**: `/user/[id]/stats` — self-only (server load 403's on mismatch).
+  Renders `flickr.stats.getTotalViews` aggregate cards (total / photos /
+  photostream / albums / galleries / collections) and the top-12 most-viewed
+  photos via `flickr.stats.getPopularPhotos`, with a view-count overlay on each
+  thumbnail. Catches Flickr error codes 1 + 99 to render a "Flickr Pro required"
+  notice for non-Pro accounts instead of erroring out.
+- **`<UserChrome>`** now takes an `isSelf` prop and conditionally appends the
+  Camera Roll + Stats tabs only when viewing your own profile. Every consumer
+  page passes `isSelf={data.me?.nsid === data.user.nsid}`.
+- **Comments CSS fix**: the generic `article { display: grid; … }` rule on the
+  page wrapper was bleeding into `<article class="comment">`, turning every
+  comment into a broken 2-column grid where the header collided with the body
+  text. Added `display: block` to `.comment` to override.

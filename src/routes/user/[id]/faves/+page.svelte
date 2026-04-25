@@ -7,9 +7,9 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let photos = $state<FlickrPhotoSummary[]>(untrack(() => data.photos.photo));
-	let currentPage = $state(untrack(() => data.photos.page));
-	let totalPages = $state(untrack(() => data.photos.pages));
+	let photos = $state<FlickrPhotoSummary[]>(untrack(() => data.faves.photo));
+	let currentPage = $state(untrack(() => data.faves.page));
+	let totalPages = $state(untrack(() => data.faves.pages));
 	let loading = $state(false);
 	let lastUserKey = $state(untrack(() => data.userKey));
 	let sentinelEl: HTMLElement | null = $state(null);
@@ -18,7 +18,7 @@
 		try {
 			sessionStorage.setItem(
 				'contactsheet:stream',
-				JSON.stringify({ ids, userKey, tab: 'photostream' })
+				JSON.stringify({ ids, userKey, tab: 'faves' })
 			);
 		} catch {
 			/* ignore */
@@ -28,9 +28,9 @@
 	$effect(() => {
 		if (data.userKey !== lastUserKey) {
 			lastUserKey = data.userKey;
-			photos = data.photos.photo;
-			currentPage = data.photos.page;
-			totalPages = data.photos.pages;
+			photos = data.faves.photo;
+			currentPage = data.faves.page;
+			totalPages = data.faves.pages;
 		}
 		stashStream(
 			photos.map((p) => p.id),
@@ -44,7 +44,7 @@
 		try {
 			const next = currentPage + 1;
 			const res = await fetch(
-				`/api/user/${encodeURIComponent(data.userKey)}/photos?page=${next}`
+				`/api/user/${encodeURIComponent(data.userKey)}/faves?page=${next}`
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const pageData = (await res.json()) as { photo: FlickrPhotoSummary[]; page: number };
@@ -77,8 +77,8 @@
 <UserChrome
 	user={data.user}
 	userKey={data.userKey}
-	activeTab="photostream"
-	subtitle="{data.photos.total.toLocaleString()} photos"
+	activeTab="faves"
+	subtitle="{Number(data.faves.total).toLocaleString()} faves"
 	isSelf={data.me?.nsid === data.user.nsid}
 />
 
@@ -95,14 +95,14 @@
 	{/each}
 </div>
 
-{#if currentPage < totalPages}
+{#if photos.length === 0}
+	<p class="empty">No public faves.</p>
+{:else if currentPage < totalPages}
 	<div class="sentinel" bind:this={sentinelEl} aria-hidden="true">
-		{#if loading}
-			loading more…
-		{/if}
+		{#if loading}loading more…{/if}
 	</div>
-{:else if photos.length > 0}
-	<div class="end">end of stream · {photos.length.toLocaleString()} photos loaded</div>
+{:else}
+	<div class="end">end of faves · {photos.length.toLocaleString()} loaded</div>
 {/if}
 
 <style>
@@ -131,6 +131,7 @@
 	.cell:hover img {
 		transform: scale(1.04);
 	}
+	.empty,
 	.sentinel,
 	.end {
 		text-align: center;

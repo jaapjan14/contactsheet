@@ -17,6 +17,7 @@
 	userKey={data.userKey}
 	activeTab="albums"
 	{subtitle}
+	isSelf={data.me?.nsid === data.user.nsid}
 />
 
 <div class="grid">

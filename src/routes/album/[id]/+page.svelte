@@ -79,6 +79,7 @@
 	userKey={data.userKey}
 	activeTab="albums"
 	subtitle="{data.user.photos?.count._content ?? '?'} photos"
+	isSelf={data.me?.nsid === data.user.nsid}
 />
 
 <section class="album-header">

@@ -14,11 +14,38 @@
 	let lastUserKey = $state(untrack(() => data.userKey));
 	let sentinelEl: HTMLElement | null = $state(null);
 
+	function monthKey(p: FlickrPhotoSummary): string {
+		const taken = p.datetaken ?? '';
+		// "2026-01-15 14:30:22" → "2026-01"; fallback bucket "Undated"
+		const m = taken.match(/^(\d{4})-(\d{2})/);
+		return m ? `${m[1]}-${m[2]}` : 'Undated';
+	}
+
+	const grouped = $derived.by(() => {
+		const g = new Map<string, FlickrPhotoSummary[]>();
+		for (const p of photos) {
+			const key = monthKey(p);
+			const list = g.get(key);
+			if (list) list.push(p);
+			else g.set(key, [p]);
+		}
+		// Map preserves insertion order; photos are already date-desc from Flickr,
+		// so the buckets come out in the right order.
+		return Array.from(g.entries());
+	});
+
+	function formatMonth(key: string): string {
+		if (key === 'Undated') return 'Undated';
+		const [y, m] = key.split('-');
+		const d = new Date(Number(y), Number(m) - 1, 1);
+		return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+	}
+
 	function stashStream(ids: string[], userKey: string) {
 		try {
 			sessionStorage.setItem(
 				'contactsheet:stream',
-				JSON.stringify({ ids, userKey, tab: 'photostream' })
+				JSON.stringify({ ids, userKey, tab: 'camera-roll' })
 			);
 		} catch {
 			/* ignore */
@@ -77,42 +104,71 @@
 <UserChrome
 	user={data.user}
 	userKey={data.userKey}
-	activeTab="photostream"
-	subtitle="{data.photos.total.toLocaleString()} photos"
+	activeTab="camera-roll"
+	subtitle="{Number(data.photos.total).toLocaleString()} photos"
 	isSelf={data.me?.nsid === data.user.nsid}
 />
 
-<div class="grid">
-	{#each photos as p (p.id)}
-		<a class="cell" href="/photo/{p.id}" title={p.title}>
-			<img
-				src={photoUrl(p, 'z')}
-				alt={p.title}
-				loading="lazy"
-				style="view-transition-name: photo-{p.id};"
-			/>
-		</a>
+<div class="roll">
+	{#each grouped as [key, monthPhotos] (key)}
+		<section class="month">
+			<h2>{formatMonth(key)} <span class="count">{monthPhotos.length}</span></h2>
+			<div class="grid">
+				{#each monthPhotos as p (p.id)}
+					<a class="cell" href="/photo/{p.id}" title={p.title}>
+						<img
+							src={photoUrl(p, 'z')}
+							alt={p.title}
+							loading="lazy"
+							style="view-transition-name: photo-{p.id};"
+						/>
+					</a>
+				{/each}
+			</div>
+		</section>
 	{/each}
 </div>
 
 {#if currentPage < totalPages}
 	<div class="sentinel" bind:this={sentinelEl} aria-hidden="true">
-		{#if loading}
-			loading more…
-		{/if}
+		{#if loading}loading more…{/if}
 	</div>
 {:else if photos.length > 0}
-	<div class="end">end of stream · {photos.length.toLocaleString()} photos loaded</div>
+	<div class="end">end of roll · {photos.length.toLocaleString()} photos</div>
 {/if}
 
 <style>
+	.roll {
+		max-width: 80rem;
+		margin: 1.5rem auto 0;
+		padding: 0 1.5rem;
+	}
+	.month {
+		margin-bottom: 2rem;
+	}
+	.month h2 {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--fg-muted);
+		margin: 0 0 0.6rem;
+		padding-bottom: 0.4rem;
+		border-bottom: 1px solid var(--border);
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+	}
+	.count {
+		color: #555;
+		font-size: 0.7rem;
+		letter-spacing: 0.06em;
+	}
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 		gap: 4px;
-		max-width: 80rem;
-		margin: 1.5rem auto;
-		padding: 0 1.5rem;
 	}
 	.cell {
 		display: block;

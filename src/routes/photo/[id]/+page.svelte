@@ -802,6 +802,10 @@
 		color: #c8c8c8;
 	}
 	.comment {
+		/* Override the generic `article { display: grid }` rule from the page
+		   layout — `<article class="comment">` is a flow-content block, not a
+		   2-column grid. */
+		display: block;
 		padding: 0.6rem 0;
 		border-bottom: 1px solid var(--border);
 	}
