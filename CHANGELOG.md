@@ -213,3 +213,11 @@
     horizontal motion (which on macOS competes with the browser's back-gesture)
     no longer accidentally pages through photos. Arrow keys, on-screen prev/
     next chevrons, and the close button remain the precise inputs.
+- **Scroll-position-on-close fix (the real one)**: previous attempt gated the
+  `history.back()` path on `document.referrer` being same-origin, which is
+  unreliable for SPA navigation — SvelteKit client routing doesn't update
+  `document.referrer`. Switched the gate to `streamCtx` existing in
+  sessionStorage, which is set whenever the lightbox was entered from one of
+  our grids. With `replaceState` on arrow paging + `history.back()` on close,
+  closing the lightbox now consistently drops you back at the exact thumbnail
+  in the grid, regardless of how many photos you arrowed through.

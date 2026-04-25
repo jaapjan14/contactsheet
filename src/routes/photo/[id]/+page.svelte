@@ -182,13 +182,13 @@
 	}
 
 	function close() {
-		// If we came from a grid in this tab, history.back() restores scroll natively.
-		// If deep-linked (no referrer in our origin), fall back to a fresh navigation.
-		const sameOriginReferrer =
-			typeof document !== 'undefined' &&
-			document.referrer &&
-			new URL(document.referrer).origin === window.location.origin;
-		if (sameOriginReferrer && window.history.length > 1) {
+		// `streamCtx` is set on grid pages (photostream/album/group/etc.) and
+		// persists in sessionStorage for this tab. Its presence is the strong
+		// signal that the lightbox was entered from a grid one history step
+		// back — `history.back()` restores SvelteKit's saved scroll position
+		// to that grid natively. document.referrer is unreliable here because
+		// SPA navigations don't update it.
+		if (typeof window !== 'undefined' && streamCtx && window.history.length > 1) {
 			window.history.back();
 		} else {
 			goto(backHref);
