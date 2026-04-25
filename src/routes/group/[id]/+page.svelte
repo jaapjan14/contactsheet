@@ -21,6 +21,14 @@
 		return `https://farm${g.iconfarm}.staticflickr.com/${g.iconserver}/buddyicons/${g.id}.jpg`;
 	});
 
+	function back() {
+		if (typeof window === 'undefined') return;
+		const sameOrigin =
+			document.referrer && new URL(document.referrer).origin === window.location.origin;
+		if (sameOrigin && window.history.length > 1) window.history.back();
+		else window.location.href = '/';
+	}
+
 	function stashStream(ids: string[], groupId: string) {
 		try {
 			sessionStorage.setItem(
@@ -81,6 +89,10 @@
 	});
 </script>
 
+<nav class="topnav">
+	<button type="button" class="back" onclick={back}>← Back</button>
+</nav>
+
 <header class="group-header">
 	<img class="icon" src={groupIcon} alt="" />
 	<div class="who">
@@ -114,12 +126,31 @@
 {/if}
 
 <style>
+	.topnav {
+		max-width: 80rem;
+		margin: 1.5rem auto 0;
+		padding: 0 1.5rem;
+	}
+	.back {
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		color: var(--fg);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		padding: 0.4rem 0.85rem;
+		border-radius: 3px;
+		cursor: pointer;
+	}
+	.back:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
 	.group-header {
 		display: flex;
 		align-items: center;
 		gap: 1rem;
 		max-width: 80rem;
-		margin: 2rem auto 1rem;
+		margin: 1rem auto 1rem;
 		padding: 0 1.5rem;
 		border-bottom: 1px solid var(--border);
 		padding-bottom: 1rem;

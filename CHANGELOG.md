@@ -198,3 +198,18 @@
 - All five tab slots in the user nav are now live (Photostream, Albums, Faves,
   Galleries, Groups), plus Camera Roll + Stats when viewing your own profile.
   Nothing greyed out anymore.
+- Groups page UX: toolbar with a filter input ("Filter 200 groups…") and a
+  Joined / A–Z sort toggle. Filter is case-insensitive substring match on the
+  decoded display name; sort happens client-side, no extra API calls.
+- Group detail page: explicit "← Back" button at the top that prefers
+  `history.back()` when the referrer is same-origin, falls back to navigating
+  home for direct deep-links.
+- Lightbox exit affordances tightened up:
+  - "← Back to {context}" button at the top of the metadata sidebar (context
+    is the album / group / gallery / faves / etc. the photo was opened from)
+  - Close X is now full-opacity instead of 55% by default — visible from the
+    moment the lightbox opens, not just on figure hover
+  - Trackpad swipe paging threshold bumped 90 → 180 px so casual two-finger
+    horizontal motion (which on macOS competes with the browser's back-gesture)
+    no longer accidentally pages through photos. Arrow keys, on-screen prev/
+    next chevrons, and the close button remain the precise inputs.

@@ -17,6 +17,23 @@
 	);
 	const isOwner = $derived(data.me?.nsid === photo.owner.nsid);
 
+	const contextLabel = $derived.by((): string => {
+		if (!streamCtx) return `${ownerName}'s photostream`;
+		if (streamCtx.albumId) return 'album';
+		if (streamCtx.groupId) return 'group';
+		if (streamCtx.galleryId) return 'gallery';
+		const map: Record<string, string> = {
+			photostream: 'photostream',
+			albums: 'albums',
+			faves: 'faves',
+			galleries: 'galleries',
+			groups: 'groups',
+			'camera-roll': 'camera roll',
+			stats: 'stats'
+		};
+		return map[streamCtx.tab] ?? streamCtx.tab;
+	});
+
 	// Local copies that update on save — keeps UI snappy without a full page reload
 	let liveTitle = $state(untrack(() => data.photo.title._content || ''));
 	let liveDesc = $state(untrack(() => data.photo.description._content || ''));
@@ -146,7 +163,11 @@
 	let fullscreen = $state(false);
 	let figureEl: HTMLElement | null = $state(null);
 
-	const SWIPE_PX = 90;
+	// Bumped from 90 → 180 so a casual two-finger horizontal swipe (which on Mac
+	// also competes with the browser back-gesture) doesn't accidentally page the
+	// photo. Keyboard arrows + click on the on-screen prev/next chevrons remain
+	// the precise paging inputs.
+	const SWIPE_PX = 180;
 	let cooldownUntil = 0;
 	let wheelAccum = 0;
 
@@ -325,6 +346,10 @@
 		</button>
 	</figure>
 	<aside>
+		<button type="button" class="back-link" onclick={close}>
+			← Back to {contextLabel}
+		</button>
+
 		{#if editingTitle}
 			<form class="edit" onsubmit={(e) => { e.preventDefault(); save(); }}>
 				<!-- svelte-ignore a11y_autofocus -->
@@ -560,14 +585,14 @@
 		width: 2.1rem;
 		height: 2.1rem;
 		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.55);
-		color: rgba(255, 255, 255, 0.85);
+		background: rgba(0, 0, 0, 0.7);
+		color: rgba(255, 255, 255, 0.95);
 		font-size: 0.95rem;
 		font-family: var(--font-sans);
 		text-decoration: none;
 		border: none;
 		cursor: pointer;
-		opacity: 0.55;
+		opacity: 1;
 		transition: opacity 0.15s ease, background 0.15s ease;
 	}
 	.iconbtn.close {
@@ -576,9 +601,9 @@
 	.iconbtn.full {
 		right: 3.2rem;
 	}
-	figure:hover .iconbtn,
 	.iconbtn:focus-visible {
-		opacity: 1;
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.iconbtn:hover {
 		background: rgba(0, 0, 0, 0.85);
@@ -637,6 +662,22 @@
 	}
 	aside {
 		font-family: var(--font-sans);
+	}
+	.back-link {
+		display: inline-block;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		color: var(--fg);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		padding: 0.4rem 0.85rem;
+		border-radius: 3px;
+		cursor: pointer;
+		margin-bottom: 1rem;
+	}
+	.back-link:hover {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	h1 {
 		margin: 0 0 0.5rem;
