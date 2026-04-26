@@ -53,30 +53,28 @@
 		</a>
 	{/if}
 
-	<!-- Compact overflow menu: secondary nav + Flickr auth state.
-	     Native <details> for tap+keyboard accessibility without JS. -->
+	<!-- Single overflow menu: global navigation, Flickr auth, and the
+	     app-level lock all live here so the header itself is just
+	     brand · search · spacer · me · ⋯. Native <details> for tap +
+	     keyboard accessibility without JS. -->
 	<details class="menu">
 		<summary aria-label="Menu" title="Menu">⋯</summary>
 		<div class="menu-panel">
 			<a href="/">Home</a>
 			<a href="/explore">Explore</a>
+			<hr />
 			{#if data.me}
-				<hr />
 				<form method="POST" action="/auth/logout" class="menu-form">
 					<button type="submit">Sign out of Flickr</button>
 				</form>
 			{:else}
-				<hr />
 				<a href="/auth/start">Sign in to Flickr</a>
 			{/if}
+			<form method="POST" action="/logout" class="menu-form">
+				<button type="submit">🔒 Lock ContactSheet</button>
+			</form>
 		</div>
 	</details>
-
-	<form method="POST" action="/logout" class="logout-form">
-		<button type="submit" class="logout" title="Lock ContactSheet (clears app session)">
-			🔒
-		</button>
-	</form>
 </header>
 {/if}
 
@@ -155,30 +153,19 @@
 	.search input:focus {
 		border-color: var(--accent);
 	}
-	.me,
-	.logout {
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-	}
 	.me {
+		font-family: var(--font-mono);
+		font-size: 0.9rem;
+		font-weight: 500;
 		color: var(--fg);
+		padding: 0.15rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 3px;
 	}
-	.logout-form {
-		margin: 0;
+	.me:hover {
+		border-color: var(--accent);
+		text-decoration: none;
 	}
-	.logout {
-		background: none;
-		border: none;
-		color: var(--fg-muted);
-		cursor: pointer;
-		padding: 0.1rem 0.25rem;
-		font-size: 1rem;
-		line-height: 1;
-	}
-	.logout:hover {
-		color: var(--fg);
-	}
-
 	/* Overflow menu (⋯) */
 	.menu {
 		position: relative;
