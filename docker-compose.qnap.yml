@@ -50,6 +50,12 @@ services:
       # so a relative `.env` resolves to /tmp/.env and fails.
       - /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet/.env
 
+    # `environment:` overrides `env_file` for matching keys. The password is
+    # easy to rotate from Container Station's YAML editor — change the value
+    # below, click Apply / Recreate. Other secrets stay in .env (set once).
+    environment:
+      APP_PASSWORD: change-me-in-container-station
+
     volumes:
       # Persists the OAuth token (data/auth.json) across image rebuilds.
       - /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet/data:/app/data
