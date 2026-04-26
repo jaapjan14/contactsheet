@@ -70,7 +70,7 @@
 	<details class="menu">
 		<summary aria-label="Menu" title="Menu">⋯</summary>
 		<div class="menu-panel">
-			<a href="/">Home</a>
+			<a href="/">ContactSheet</a>
 			<a href="/explore">Explore</a>
 			<hr />
 			{#if data.me}

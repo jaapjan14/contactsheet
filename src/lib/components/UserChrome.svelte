@@ -88,7 +88,7 @@
 			{/each}
 		</optgroup>
 		<optgroup label="Browse">
-			<option value="_home">Home</option>
+			<option value="_home">ContactSheet</option>
 			<option value="_explore">Explore</option>
 		</optgroup>
 	</select>
