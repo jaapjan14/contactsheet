@@ -81,7 +81,7 @@
 				<a href="/auth/start">Sign in to Flickr</a>
 			{/if}
 			<form method="POST" action="/logout" class="menu-form">
-				<button type="submit">🔒 Lock ContactSheet</button>
+				<button type="submit">Sign out of ContactSheet</button>
 			</form>
 		</div>
 	</details>
