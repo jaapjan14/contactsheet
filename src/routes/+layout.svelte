@@ -37,7 +37,6 @@
 <header>
 	<a href="/" class="brand">ContactSheet</a>
 	<span class="tagline">a contact sheet for Flickr</span>
-	<a href="/explore" class="nav-link">Explore</a>
 	<form class="search" method="get" action="/search" role="search">
 		<input
 			name="q"
@@ -52,12 +51,27 @@
 		<a href="/user/{data.me.username}/photostream" class="me">
 			{data.me.fullname || data.me.username}
 		</a>
-		<form method="POST" action="/auth/logout" class="logout-form">
-			<button type="submit" class="logout" title="Sign out of Flickr">flickr →</button>
-		</form>
-	{:else}
-		<a href="/auth/start" class="signin">sign in to Flickr</a>
 	{/if}
+
+	<!-- Compact overflow menu: secondary nav + Flickr auth state.
+	     Native <details> for tap+keyboard accessibility without JS. -->
+	<details class="menu">
+		<summary aria-label="Menu" title="Menu">⋯</summary>
+		<div class="menu-panel">
+			<a href="/">Home</a>
+			<a href="/explore">Explore</a>
+			{#if data.me}
+				<hr />
+				<form method="POST" action="/auth/logout" class="menu-form">
+					<button type="submit">Sign out of Flickr</button>
+				</form>
+			{:else}
+				<hr />
+				<a href="/auth/start">Sign in to Flickr</a>
+			{/if}
+		</div>
+	</details>
+
 	<form method="POST" action="/logout" class="logout-form">
 		<button type="submit" class="logout" title="Lock ContactSheet (clears app session)">
 			🔒
@@ -118,15 +132,6 @@
 		font-family: var(--font-mono);
 		white-space: nowrap;
 	}
-	.nav-link {
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-		color: var(--fg-muted);
-	}
-	.nav-link:hover {
-		color: var(--fg);
-		text-decoration: none;
-	}
 	.spacer {
 		flex: 1 1 0;
 		min-width: 0;
@@ -151,16 +156,12 @@
 		border-color: var(--accent);
 	}
 	.me,
-	.signin,
 	.logout {
 		font-family: var(--font-mono);
 		font-size: 0.8rem;
 	}
 	.me {
 		color: var(--fg);
-	}
-	.signin {
-		color: var(--accent);
 	}
 	.logout-form {
 		margin: 0;
@@ -176,6 +177,67 @@
 	}
 	.logout:hover {
 		color: var(--fg);
+	}
+
+	/* Overflow menu (⋯) */
+	.menu {
+		position: relative;
+	}
+	.menu summary {
+		list-style: none;
+		cursor: pointer;
+		padding: 0.1rem 0.4rem;
+		font-size: 1.2rem;
+		line-height: 1;
+		color: var(--fg-muted);
+		font-weight: 700;
+		letter-spacing: 0.05em;
+	}
+	.menu summary::-webkit-details-marker {
+		display: none;
+	}
+	.menu[open] summary {
+		color: var(--fg);
+	}
+	.menu-panel {
+		position: absolute;
+		top: calc(100% + 0.4rem);
+		right: 0;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.3rem 0;
+		min-width: 12rem;
+		z-index: 200;
+		box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+	}
+	.menu-panel a,
+	.menu-panel button {
+		display: block;
+		width: 100%;
+		padding: 0.55rem 1rem;
+		color: var(--fg);
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		text-align: left;
+		background: none;
+		border: none;
+		cursor: pointer;
+		text-decoration: none;
+	}
+	.menu-panel a:hover,
+	.menu-panel button:hover {
+		background: var(--bg);
+		color: var(--accent);
+		text-decoration: none;
+	}
+	.menu-panel hr {
+		border: none;
+		border-top: 1px solid var(--border);
+		margin: 0.3rem 0;
+	}
+	.menu-form {
+		margin: 0;
 	}
 
 	/* On mobile (≤640px): hide the tagline, no flex-spacer (everything left-
@@ -201,14 +263,6 @@
 			max-width: none;
 			padding: 0.55rem 0.75rem;
 			font-size: 0.9rem;
-		}
-		/* Explore drops to its own row beneath the search bar (because search
-		   takes the full row above it), but Explore itself only claims as
-		   much width as its text — the tap target stays just the link. */
-		.nav-link {
-			order: 11;
-			padding: 0.2rem 0;
-			align-self: flex-start;
 		}
 		.me {
 			max-width: 7rem;

@@ -1,12 +1,14 @@
 <script lang="ts">
 	import UserChrome from '$lib/components/UserChrome.svelte';
-	import { decodeFlickrEntities } from '$lib/flickr/text';
+	import { decodeFlickrEntities, sanitizeFlickrHtml } from '$lib/flickr/text';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
+	// Bios contain Flickr-supplied HTML (mostly <a>, <br>). Decode entities first
+	// so &quot; etc. become real characters, then sanitize to a safe whitelist.
 	const description = $derived(
-		decodeFlickrEntities(data.user.description?._content ?? '').trim()
+		sanitizeFlickrHtml(decodeFlickrEntities(data.user.description?._content ?? '')).trim()
 	);
 	const photoCount = $derived(data.user.photos?.count._content ?? '?');
 	const totalViews = $derived(data.user.photos?.views?._content ?? null);
@@ -52,11 +54,8 @@
 
 <section class="about">
 	{#if description}
-		<div class="bio">
-			{#each description.split(/\n\n+/) as p}
-				<p>{p}</p>
-			{/each}
-		</div>
+		<!-- Sanitized HTML — only <a>+<br> survive; inline scripts blocked by CSP -->
+		<div class="bio">{@html description}</div>
 	{:else}
 		<p class="empty">No bio.</p>
 	{/if}
@@ -103,9 +102,11 @@
 		font-family: var(--font-sans);
 		color: #c8c8c8;
 		line-height: 1.55;
+		white-space: pre-wrap;
 	}
-	.bio p {
-		margin: 0 0 1rem;
+	.bio :global(a) {
+		color: var(--accent);
+		word-break: break-word;
 	}
 	.empty {
 		font-family: var(--font-mono);
