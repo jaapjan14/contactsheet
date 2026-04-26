@@ -38,7 +38,19 @@
 	]);
 
 	function navTab(e: Event) {
-		const slug = (e.target as HTMLSelectElement).value;
+		const select = e.target as HTMLSelectElement;
+		const slug = select.value;
+		// Reset the select after handling so re-picking the same option still fires
+		const restore = () => {
+			select.value = activeTab;
+		};
+		if (slug.startsWith('_')) {
+			// Special non-tab destinations
+			if (slug === '_explore') goto('/explore');
+			else if (slug === '_home') goto('/');
+			restore();
+			return;
+		}
 		if (slug && slug !== activeTab) goto(`/user/${userKey}/${slug}`);
 	}
 </script>
@@ -70,9 +82,15 @@
 <!-- Mobile: native <select>.  Compact, no horizontal-scroll-hidden-affordance. -->
 <div class="user-nav-select">
 	<select aria-label="Section" value={activeTab} onchange={navTab}>
-		{#each tabs as tab (tab.slug)}
-			<option value={tab.slug} selected={tab.slug === activeTab}>{tab.label}</option>
-		{/each}
+		<optgroup label={user.username._content}>
+			{#each tabs as tab (tab.slug)}
+				<option value={tab.slug} selected={tab.slug === activeTab}>{tab.label}</option>
+			{/each}
+		</optgroup>
+		<optgroup label="Browse">
+			<option value="_home">Home</option>
+			<option value="_explore">Explore</option>
+		</optgroup>
 	</select>
 </div>
 
