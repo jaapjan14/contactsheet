@@ -221,7 +221,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		padding: 0.3rem 0;
-		min-width: 12rem;
+		min-width: 16rem;
 		z-index: 200;
 		box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
 	}
@@ -229,7 +229,7 @@
 	.menu-panel button {
 		display: block;
 		width: 100%;
-		padding: 0.55rem 1rem;
+		padding: 0.55rem 1.1rem;
 		color: var(--fg);
 		font-family: var(--font-mono);
 		font-size: 0.85rem;
@@ -238,6 +238,7 @@
 		border: none;
 		cursor: pointer;
 		text-decoration: none;
+		white-space: nowrap;
 	}
 	.menu-panel a:hover,
 	.menu-panel button:hover {
