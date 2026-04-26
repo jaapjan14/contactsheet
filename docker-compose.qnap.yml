@@ -30,6 +30,11 @@ services:
     #     -t contactsheet:local /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet
     # (Container Station rejects compose `build:` blocks during app validation.)
     image: contactsheet:local
+    # Never reach for a registry — `contactsheet:local` is built on the NAS
+    # itself and lives only in the local Docker image cache. Without this,
+    # Container Station's "Create application" flow tries to docker pull the
+    # tag from Docker Hub and fails with "pull access denied".
+    pull_policy: never
     container_name: contactsheet
     restart: unless-stopped
 
