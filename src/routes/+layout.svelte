@@ -59,7 +59,9 @@
 		<a href="/auth/start" class="signin">sign in to Flickr</a>
 	{/if}
 	<form method="POST" action="/logout" class="logout-form">
-		<button type="submit" class="logout" title="Lock ContactSheet (clears app session)">🔒</button>
+		<button type="submit" class="logout" title="Lock ContactSheet (clears app session)">
+			🔒
+		</button>
 	</form>
 </header>
 {/if}
@@ -97,9 +99,10 @@
 	}
 	header {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 0.75rem;
-		padding: 1rem 1.5rem;
+		gap: 0.5rem 0.85rem;
+		padding: 0.85rem 1.25rem;
 		border-bottom: 1px solid var(--border);
 	}
 	.brand {
@@ -107,36 +110,38 @@
 		font-weight: 500;
 		color: var(--fg);
 		letter-spacing: -0.01em;
+		font-size: 1rem;
 	}
 	.tagline {
 		color: var(--fg-muted);
-		font-size: 0.8rem;
+		font-size: 0.78rem;
 		font-family: var(--font-mono);
+		white-space: nowrap;
 	}
 	.nav-link {
 		font-family: var(--font-mono);
 		font-size: 0.8rem;
 		color: var(--fg-muted);
-		margin-left: 0.5rem;
 	}
 	.nav-link:hover {
 		color: var(--fg);
 		text-decoration: none;
 	}
 	.spacer {
-		flex: 1;
+		flex: 1 1 0;
+		min-width: 0;
 	}
 	.search {
-		margin: 0 0 0 0.5rem;
+		margin: 0;
 		display: flex;
 	}
 	.search input {
 		background: var(--bg-elev);
 		border: 1px solid var(--border);
 		color: var(--fg);
-		padding: 0.4rem 0.7rem;
+		padding: 0.45rem 0.7rem;
 		font-family: var(--font-mono);
-		font-size: 0.78rem;
+		font-size: 0.8rem;
 		border-radius: 3px;
 		outline: none;
 		width: 14rem;
@@ -144,13 +149,12 @@
 	}
 	.search input:focus {
 		border-color: var(--accent);
-		width: 18rem;
 	}
 	.me,
 	.signin,
 	.logout {
 		font-family: var(--font-mono);
-		font-size: 0.78rem;
+		font-size: 0.8rem;
 	}
 	.me {
 		color: var(--fg);
@@ -166,9 +170,43 @@
 		border: none;
 		color: var(--fg-muted);
 		cursor: pointer;
-		padding: 0;
+		padding: 0.1rem 0.25rem;
+		font-size: 1rem;
+		line-height: 1;
 	}
 	.logout:hover {
 		color: var(--fg);
+	}
+
+	/* On mobile (≤640px): hide the tagline, no flex-spacer (everything left-
+	   packed), and the search input wraps to its own row spanning the full
+	   header width — same shape as Darkroom Log's header on phones. */
+	@media (max-width: 640px) {
+		header {
+			padding: 0.7rem 1rem;
+			gap: 0.4rem 0.7rem;
+		}
+		.tagline {
+			display: none;
+		}
+		.spacer {
+			display: none;
+		}
+		.search {
+			order: 10;
+			flex-basis: 100%;
+		}
+		.search input {
+			width: 100%;
+			max-width: none;
+			padding: 0.55rem 0.75rem;
+			font-size: 0.9rem;
+		}
+		.me {
+			max-width: 7rem;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 </style>

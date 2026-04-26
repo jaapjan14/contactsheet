@@ -1,20 +1,29 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { requireEnv } from '$lib/server/env';
+import { readAuth } from '$lib/server/auth/store';
 import { mintSession, isSessionValid, SESSION_COOKIE, COOKIE_OPTIONS } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 const SAFE_NEXT_RE = /^\/[^/]/;
 
 function safeNext(raw: string | null): string {
-	if (!raw) return '/';
+	if (!raw) return '';
 	// Only allow same-origin paths starting with a single slash.
-	if (!SAFE_NEXT_RE.test(raw) || raw.startsWith('//')) return '/';
+	if (!SAFE_NEXT_RE.test(raw) || raw.startsWith('//')) return '';
 	return raw;
+}
+
+async function defaultLanding(): Promise<string> {
+	const auth = await readAuth();
+	if (auth?.username) {
+		return `/user/${encodeURIComponent(auth.username)}/photostream`;
+	}
+	return '/';
 }
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
 	if (isSessionValid(cookies.get(SESSION_COOKIE))) {
-		throw redirect(302, safeNext(url.searchParams.get('next')));
+		throw redirect(302, safeNext(url.searchParams.get('next')) || (await defaultLanding()));
 	}
 	return { next: safeNext(url.searchParams.get('next')) };
 };
@@ -35,6 +44,6 @@ export const actions: Actions = {
 		}
 
 		cookies.set(SESSION_COOKIE, mintSession(), COOKIE_OPTIONS);
-		throw redirect(303, next);
+		throw redirect(303, next || (await defaultLanding()));
 	}
 };

@@ -99,6 +99,14 @@
 		margin: 0 auto;
 		padding: 0 1.5rem;
 		border-bottom: 1px solid var(--border);
+		/* Horizontal scroll when the 7 tabs don't fit (mobile). Hides the
+		   scrollbar; touch / two-finger swipe still scrolls. */
+		overflow-x: auto;
+		scrollbar-width: none;
+		-webkit-overflow-scrolling: touch;
+	}
+	.user-nav::-webkit-scrollbar {
+		display: none;
 	}
 	.tab {
 		padding: 0.75rem 0;
@@ -107,6 +115,8 @@
 		color: var(--fg-muted);
 		border-bottom: 2px solid transparent;
 		margin-bottom: -1px;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.tab.active {
 		color: var(--fg);
@@ -119,5 +129,30 @@
 	.tab:not(.disabled):hover {
 		color: var(--fg);
 		text-decoration: none;
+	}
+	@media (max-width: 640px) {
+		.user-header {
+			margin: 1rem auto 0.75rem;
+			padding: 0 1rem;
+			gap: 0.75rem;
+		}
+		.avatar {
+			width: 48px;
+			height: 48px;
+		}
+		.who h1 {
+			font-size: 1.15rem;
+		}
+		.meta {
+			font-size: 0.75rem;
+		}
+		.user-nav {
+			padding: 0 1rem;
+			gap: 1.1rem;
+		}
+		.tab {
+			font-size: 0.9rem;
+			padding: 0.6rem 0;
+		}
 	}
 </style>
