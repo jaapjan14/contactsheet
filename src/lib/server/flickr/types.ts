@@ -265,6 +265,29 @@ export interface UrlsLookupGroupResponse {
 	group: { id: string; groupname: FlickrTextNode };
 }
 
+export interface FlickrGroupSearchResult {
+	nsid: string;
+	name: string;
+	eighteenplus?: number;
+	iconserver?: string;
+	iconfarm?: number;
+	members?: string;
+	pool_count?: string;
+}
+
+export interface GroupsPage {
+	page: number;
+	pages: number;
+	perpage: number;
+	total: number | string;
+	group: FlickrGroupSearchResult[];
+}
+
+export interface GroupsSearchResponse {
+	stat: string;
+	groups: GroupsPage;
+}
+
 export interface FlickrGallery {
 	id: string;
 	url: string;

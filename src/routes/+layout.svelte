@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
+	import NotificationsBell from '$lib/components/NotificationsBell.svelte';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -47,6 +48,9 @@
 		/>
 	</form>
 	<span class="spacer"></span>
+	{#if data.me}
+		<NotificationsBell />
+	{/if}
 	{#if data.me}
 		<a
 			href="/user/{data.me.username}/photostream"

@@ -10,8 +10,8 @@
 # 2. In that same directory, create a `.env` file with:
 #       FLICKR_API_KEY=...
 #       FLICKR_API_SECRET=...
-#       ORIGIN=http://192.168.0.199:3418     (LAN testing)
-#       # or ORIGIN=https://contactsheet.jjlnas.com  (Cloudflare tunnel later)
+#       ORIGIN=http://<nas-ip>:3418          (LAN testing)
+#       # or ORIGIN=https://your-domain.example  (Cloudflare tunnel later)
 #    Values are loaded into the container via `env_file:` below — Container
 #    Station does NOT auto-parse `.env` for `${VAR}` substitution in the YAML.
 #
@@ -25,7 +25,7 @@
 services:
   contactsheet:
     # Image is built outside Container Station via SSH:
-    #   ssh -p 1056 jtalakua@192.168.0.199
+    #   ssh <user>@<nas-host>
     #   /share/CACHEDEV5_DATA/.qpkg/container-station/bin/docker build \
     #     -t contactsheet:local /share/CACHEDEV5_DATA/ProgramData-vol5/Containers/contactsheet
     # (Container Station rejects compose `build:` blocks during app validation.)
@@ -48,8 +48,8 @@ services:
     # The .env on the NAS must contain:
     #   FLICKR_API_KEY=...
     #   FLICKR_API_SECRET=...
-    #   ORIGIN=http://192.168.0.199:3418     (LAN testing)
-    #   # or ORIGIN=https://contactsheet.jjlnas.com  (Cloudflare tunnel later)
+    #   ORIGIN=http://<nas-ip>:3418          (LAN testing)
+    #   # or ORIGIN=https://your-domain.example  (Cloudflare tunnel later)
     env_file:
       # Absolute path required: Container Station validates YAML from /tmp,
       # so a relative `.env` resolves to /tmp/.env and fails.

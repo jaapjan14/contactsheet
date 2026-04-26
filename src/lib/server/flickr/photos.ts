@@ -16,6 +16,7 @@ const TTL_SIZES = 7 * 24 * 60 * 60;
 const TTL_EXIF = 30 * 24 * 60 * 60; // 30 days — EXIF doesn't change once uploaded
 const TTL_COMMENTS = 60; // 1 minute — comments are mutable
 const TTL_FAVES = 60; // 1 minute — fave count is mutable
+const TTL_CONTEXTS = 60 * 60; // 1 hour — album/group membership is fairly stable
 
 export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
 	return wrap(key('photos.getInfo', { photo_id: photoId }), TTL_INFO, async () => {
@@ -24,6 +25,46 @@ export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
 			params: { photo_id: photoId }
 		});
 		return res.photo;
+	});
+}
+
+// ---- Photo contexts (albums + groups the photo belongs to) ------------
+
+export interface PhotoContextSet {
+	id: string;
+	title: string;
+	view_count?: string;
+	comment_count?: string;
+	count_photo?: string;
+	count_video?: string;
+}
+
+export interface PhotoContextPool {
+	id: string;
+	title: string;
+}
+
+export interface PhotoContexts {
+	albums: PhotoContextSet[];
+	groups: PhotoContextPool[];
+}
+
+interface AllContextsResponse {
+	stat: string;
+	set?: PhotoContextSet[];
+	pool?: PhotoContextPool[];
+}
+
+export async function getPhotoContexts(photoId: string): Promise<PhotoContexts> {
+	return wrap(key('photos.getAllContexts', { photo_id: photoId }), TTL_CONTEXTS, async () => {
+		const res = await flickrMaybeSigned<AllContextsResponse>({
+			method: 'flickr.photos.getAllContexts',
+			params: { photo_id: photoId }
+		});
+		return {
+			albums: res.set ?? [],
+			groups: res.pool ?? []
+		};
 	});
 }
 

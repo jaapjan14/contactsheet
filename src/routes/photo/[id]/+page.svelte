@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { goto, preloadData } from '$app/navigation';
+	import { makeZoomer, type Zoomer } from '$lib/zoom';
+	import { decodeFlickrEntities, sanitizeFlickrHtml } from '$lib/flickr/text';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -39,6 +41,10 @@
 	// Local copies that update on save — keeps UI snappy without a full page reload
 	let liveTitle = $state(untrack(() => data.photo.title._content || ''));
 	let liveDesc = $state(untrack(() => data.photo.description._content || ''));
+	// Flickr descriptions arrive as HTML (mostly <a>, <br>) with entity-encoded
+	// chars. Decode the entities first, then sanitize to a safe whitelist —
+	// otherwise `<a href=...>Instagram</a>` renders as literal text.
+	const liveDescHtml = $derived(sanitizeFlickrHtml(decodeFlickrEntities(liveDesc)).trim());
 	let lastPhotoId = $state(untrack(() => data.photo.id));
 
 	$effect(() => {
@@ -250,6 +256,11 @@
 
 	let fullscreen = $state(false);
 	let figureEl: HTMLElement | null = $state(null);
+	let imgEl: HTMLImageElement | null = $state(null);
+	let zoomer: Zoomer | null = null;
+	function isZoomed() {
+		return zoomer?.isZoomed() ?? false;
+	}
 
 	// Horizontal swipe = page prev/next; vertical = swipe-up-to-close.
 	// Horizontal threshold bumped to 180 so casual two-finger motion (which on
@@ -267,6 +278,10 @@
 		const now = Date.now();
 		if (now < cooldownUntil) return;
 		cooldownUntil = now + 350;
+		// Reset transform before paging so the View Transitions snapshot is at
+		// identity — otherwise a paged-while-zoomed image morphs from its zoomed
+		// state into the next photo's identity, which looks bad.
+		zoomer?.reset();
 		// replaceState so the grid stays one history step away no matter how many
 		// photos the user pages through — Esc / X / swipe-down restore the grid scroll
 		goto(`/photo/${id}`, { replaceState: true, noScroll: true });
@@ -286,11 +301,37 @@
 		}
 	}
 
+	// Cascading "back" — same priority Esc has used all along: cancel zoom,
+	// then exit fullscreen, then leave the photo entirely. Used by the ✕
+	// button and the swipe/wheel close gestures so a single dismiss action
+	// from inside fullscreen drops you on the photo info page (with EXIF,
+	// comments, etc.), not all the way back to the grid. A second dismiss
+	// from the info page goes to the grid.
+	function backOrClose() {
+		if (isZoomed()) {
+			zoomer?.reset();
+			return;
+		}
+		if (fullscreen) {
+			fullscreen = false;
+			return;
+		}
+		close();
+	}
+
 	function onFigureClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 		// Don't toggle fullscreen if the click landed on a nav arrow or icon button
 		if (target.closest('a.nav, .iconbtn')) return;
-		fullscreen = !fullscreen;
+		// While zoomed in, a click should NOT collapse fullscreen — the user
+		// is interacting with the zoomed image. They can double-click to reset
+		// or hit Esc; that's our "exit zoom" affordance.
+		if (isZoomed()) return;
+		// In fullscreen, a single click is reserved for "potential first half of
+		// a double-click-to-zoom" — exiting on it would race with dblclick and
+		// produce a bounce. Use ✕, Esc, or swipe-↕ to exit fullscreen instead.
+		if (fullscreen) return;
+		fullscreen = true;
 	}
 
 	function onNavClick(e: MouseEvent, id: string | null) {
@@ -318,7 +359,8 @@
 				pageTo(nextId);
 			} else if (e.key === 'Escape') {
 				e.preventDefault();
-				if (fullscreen) fullscreen = false;
+				if (isZoomed()) zoomer?.reset();
+				else if (fullscreen) fullscreen = false;
 				else close();
 			} else if (e.key === 'f' || e.key === 'F') {
 				e.preventDefault();
@@ -333,6 +375,9 @@
 		if (!figureEl) return;
 
 		const onWheel = (e: WheelEvent) => {
+			// While zoomed, the zoomer owns the wheel — let it pan/zoom.
+			if (isZoomed()) return;
+
 			const absX = Math.abs(e.deltaX);
 			const absY = Math.abs(e.deltaY);
 
@@ -346,7 +391,7 @@
 				if (wheelAccumY < -VERT_CLOSE_PX && absX < 40) {
 					wheelAccumY = 0;
 					cooldownUntil = Date.now() + 350;
-					close();
+					backOrClose();
 				}
 				return;
 			}
@@ -372,20 +417,36 @@
 
 		let touchStartX = 0;
 		let touchStartY = 0;
+		// Track whether any multi-touch gesture happened during this stroke.
+		// Without this, lifting fingers from a pinch in different order made
+		// `e.changedTouches[0].clientX - touchStartX` measure (finger#2's end −
+		// finger#1's start), which can be a huge "swipe" and trigger close.
+		let multiTouchSeen = false;
 		const onTouchStart = (e: TouchEvent) => {
-			touchStartX = e.touches[0].clientX;
-			touchStartY = e.touches[0].clientY;
+			if (e.touches.length === 1) {
+				touchStartX = e.touches[0].clientX;
+				touchStartY = e.touches[0].clientY;
+				multiTouchSeen = false;
+			} else {
+				multiTouchSeen = true;
+			}
 		};
 		const onTouchEnd = (e: TouchEvent) => {
+			// While zoomed, pans should not be reinterpreted as paging or close
+			// gestures. The zoomer owns single-finger drag in that mode.
+			if (isZoomed()) return;
+			// Pinch / multi-finger: not a swipe — bail.
+			if (multiTouchSeen) return;
 			const dx = e.changedTouches[0].clientX - touchStartX;
 			const dy = e.changedTouches[0].clientY - touchStartY;
 			const absX = Math.abs(dx);
 			const absY = Math.abs(dy);
-			// Vertical swipe (either direction) closes the lightbox — preserves scroll
+			// Vertical swipe (either direction) — first exits fullscreen if we're
+			// in it, otherwise closes back to the grid. Mirrors the Esc cascade.
 			if (absY > SWIPE_PX && absY > absX * 1.5) {
 				if (Date.now() < cooldownUntil) return;
 				cooldownUntil = Date.now() + 350;
-				close();
+				backOrClose();
 				return;
 			}
 			// Horizontal swipe pages
@@ -408,6 +469,107 @@
 		if (prevId) preloadData(`/photo/${prevId}`);
 		if (nextId) preloadData(`/photo/${nextId}`);
 	});
+
+	// Zoom is only active in fullscreen — the lightbox view at 1× still has
+	// the metadata sidebar visible, where pinch/drag would feel out of place.
+	// Reading `data.photo.id` ties the effect to the current photo so paging
+	// to a new image tears down + rebuilds the zoomer (resetting transform).
+	$effect(() => {
+		void data.photo.id;
+		if (!fullscreen || !imgEl) return;
+		const target = imgEl;
+		// Wait until the image is laid out so offsetLeft/clientWidth are real.
+		const attach = () => {
+			zoomer = makeZoomer(target);
+		};
+		if (target.complete && target.naturalWidth > 0) {
+			attach();
+		} else {
+			target.addEventListener('load', attach, { once: true });
+		}
+		return () => {
+			target.removeEventListener('load', attach);
+			zoomer?.destroy();
+			zoomer = null;
+		};
+	});
+
+	// Two-tier progressive high-res swap. <img src={imgSrc}> is reactive.
+	//   stage 'display' → 2048 _k.jpg (initial render, fast)
+	//   stage 'highRes' → X-Large 6K _6k.jpg (~1 MB, swaps in ~1 sec)
+	//   stage 'maxRes'  → Original _o.jpg (15-40 MB, matches Flickr's viewer
+	//                                       pixel-for-pixel; arrives in 10-30s)
+	// We can't use imperative `target.src = url` — the bound expression
+	// `src={imgSrc}` re-applies on every reactive tick and would yank src
+	// back to display.source.
+	type Stage = 'display' | 'highRes' | 'maxRes';
+	let imgStage = $state<Stage>('display');
+	$effect(() => {
+		void data.photo.id;
+		imgStage = 'display';
+	});
+
+	// Stage 1: load the mid-tier 6K. Runs as soon as fullscreen is entered.
+	$effect(() => {
+		if (!fullscreen) return;
+		if (imgStage !== 'display') return;
+		if (!data.highRes) return;
+		const url = data.highRes.source;
+		const photoIdAtStart = data.photo.id;
+		const preloader = new Image();
+		let cancelled = false;
+		preloader.onload = () => {
+			if (cancelled) return;
+			if (data.photo.id !== photoIdAtStart) return;
+			imgStage = 'highRes';
+		};
+		preloader.onerror = () => {
+			if (cancelled) return;
+			console.warn('highRes preload failed', url);
+		};
+		preloader.src = url;
+		return () => {
+			cancelled = true;
+			preloader.onload = null;
+			preloader.onerror = null;
+		};
+	});
+
+	// Stage 2: once 6K is in (or there is no 6K), start chasing the Original
+	// in the background. Big file — but at the point this fires the user
+	// already has a sharp 6K to look at, so the long load is non-blocking.
+	$effect(() => {
+		if (!fullscreen) return;
+		if (imgStage !== 'highRes' && data.highRes) return;
+		if (imgStage === 'maxRes') return;
+		if (!data.maxRes) return;
+		const url = data.maxRes.source;
+		const photoIdAtStart = data.photo.id;
+		const preloader = new Image();
+		let cancelled = false;
+		preloader.onload = () => {
+			if (cancelled) return;
+			if (data.photo.id !== photoIdAtStart) return;
+			imgStage = 'maxRes';
+		};
+		preloader.onerror = () => {
+			if (cancelled) return;
+			console.warn('maxRes preload failed', url);
+		};
+		preloader.src = url;
+		return () => {
+			cancelled = true;
+			preloader.onload = null;
+			preloader.onerror = null;
+		};
+	});
+
+	const imgSrc = $derived.by(() => {
+		if (!fullscreen) return display.source;
+		if (imgStage === 'maxRes' && data.maxRes) return data.maxRes.source;
+		if (imgStage === 'highRes' && data.highRes) return data.highRes.source;
+		return display.source;
+	});
 </script>
 
 <article class:fullscreen>
@@ -415,7 +577,8 @@
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<figure bind:this={figureEl} onclick={onFigureClick}>
 		<img
-			src={display.source}
+			bind:this={imgEl}
+			src={imgSrc}
 			width={display.width}
 			height={display.height}
 			alt={photo.title._content}
@@ -466,7 +629,7 @@
 		>
 			{#if fullscreen}⤢{:else}⤡{/if}
 		</button>
-		<button type="button" class="iconbtn close" onclick={close} aria-label="Close" title="Close (Esc)">
+		<button type="button" class="iconbtn close" onclick={backOrClose} aria-label="Close" title="Close (Esc)">
 			✕
 		</button>
 	</figure>
@@ -521,9 +684,11 @@
 					placeholder="Description"
 				></textarea>
 			</form>
-		{:else if liveDesc.trim()}
+		{:else if liveDescHtml}
 			<p class="desc">
-				{liveDesc.trim()}
+				<!-- Sanitized HTML — only safe tags survive; CSP blocks any inline scripts. -->
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+				{@html liveDescHtml}
 				{#if isOwner}
 					<button
 						type="button"
@@ -560,14 +725,6 @@
 			</div>
 		{/if}
 
-		{#if tags.length > 0}
-			<ul class="tags">
-				{#each tags as tag}
-					<li>{tag.raw}</li>
-				{/each}
-			</ul>
-		{/if}
-
 		{#if photo.location}
 			<p class="loc">
 				📍
@@ -582,9 +739,12 @@
 		{/if}
 
 		{#if shotDetails}
-			<section class="shot">
-				<h3>Shot details</h3>
-				<dl>
+			<details class="discl shot-discl">
+				<summary>
+					Shot details
+					{#if shotDetails.camera}<span class="discl-tag">{shotDetails.camera}</span>{/if}
+				</summary>
+				<dl class="shot-dl">
 					{#if shotDetails.camera}
 						<dt>Camera</dt>
 						<dd>{shotDetails.camera}</dd>
@@ -610,47 +770,108 @@
 						<dd>{shotDetails.iso}</dd>
 					{/if}
 				</dl>
-			</section>
+			</details>
+		{/if}
+
+		{#if data.contexts && data.contexts.albums.length > 0}
+			<details class="discl">
+				<summary>
+					In albums
+					<span class="discl-count">{data.contexts.albums.length}</span>
+				</summary>
+				<ul class="context-list">
+					{#each data.contexts.albums as a (a.id)}
+						<li>
+							<a href="/album/{a.id}">
+								{a.title}
+							</a>
+							{#if a.count_photo}
+								<span class="ctx-count">· {a.count_photo} photos</span>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</details>
+		{/if}
+
+		{#if data.contexts && data.contexts.groups.length > 0}
+			<details class="discl">
+				<summary>
+					In groups
+					<span class="discl-count">{data.contexts.groups.length}</span>
+				</summary>
+				<ul class="context-list">
+					{#each data.contexts.groups as g (g.id)}
+						<li>
+							<a href="/group/{g.id}">
+								{g.title}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</details>
 		{/if}
 
 		{#if liveComments.length > 0 || data.me}
-			<section class="comments">
-				{#if liveComments.length > 0}
-					<h3>Comments ({liveComments.length})</h3>
-					{#each liveComments as c (c.id)}
-						<article class="comment">
-							<header>
-								<a href="/user/{c.path_alias || c.author}/photostream">
-									{c.realname || c.authorname}
-								</a>
-								<time>{formatCommentDate(c.datecreate)}</time>
-							</header>
-							<p>{decodeAndStripHtml(c._content)}</p>
-						</article>
-					{/each}
-				{:else}
-					<h3>Comments</h3>
-					<p class="empty-comments">Be the first to comment.</p>
-				{/if}
+			<details class="discl comments-discl">
+				<summary>
+					Comments
+					{#if liveComments.length > 0}
+						<span class="discl-count">{liveComments.length}</span>
+					{/if}
+				</summary>
+				<div class="comments-body">
+					{#if liveComments.length > 0}
+						{#each liveComments as c (c.id)}
+							<article class="comment">
+								<header>
+									<a href="/user/{c.path_alias || c.author}/photostream">
+										{c.realname || c.authorname}
+									</a>
+									<time>{formatCommentDate(c.datecreate)}</time>
+								</header>
+								<p>{decodeAndStripHtml(c._content)}</p>
+							</article>
+						{/each}
+					{:else}
+						<p class="empty-comments">Be the first to comment.</p>
+					{/if}
 
-				{#if data.me}
-					<form class="comment-form" onsubmit={submitComment}>
-						<textarea
-							bind:value={commentDraft}
-							placeholder="Add a comment as {data.me.fullname || data.me.username}…"
-							rows="3"
-						></textarea>
-						<div class="comment-actions">
-							<button type="submit" class="btn primary" disabled={!commentDraft.trim() || posting}>
-								{posting ? 'posting…' : 'post'}
-							</button>
-							{#if commentError}
-								<span class="save-error">{commentError}</span>
-							{/if}
-						</div>
-					</form>
-				{/if}
-			</section>
+					{#if data.me}
+						<form class="comment-form" onsubmit={submitComment}>
+							<textarea
+								bind:value={commentDraft}
+								placeholder="Add a comment as {data.me.fullname || data.me.username}…"
+								rows="3"
+							></textarea>
+							<div class="comment-actions">
+								<button type="submit" class="btn primary" disabled={!commentDraft.trim() || posting}>
+									{posting ? 'posting…' : 'post'}
+								</button>
+								{#if commentError}
+									<span class="save-error">{commentError}</span>
+								{/if}
+							</div>
+						</form>
+					{/if}
+				</div>
+			</details>
+		{/if}
+
+		{#if tags.length > 0}
+			<details class="tags-disclosure">
+				<summary>
+					Tags
+					<span class="tags-count">{tags.length}</span>
+				</summary>
+				<ul class="tags">
+					{#each tags as tag}
+						<li>
+							<a href="/search?tags={encodeURIComponent(tag.raw)}">{tag.raw}</a>
+						</li>
+					{/each}
+				</ul>
+			</details>
 		{/if}
 
 		<p class="links">
@@ -658,7 +879,7 @@
 			{#if flickrPageUrl} · <a href={flickrPageUrl} target="_blank" rel="noopener">on flickr.com</a>{/if}
 		</p>
 		{#if streamCtx}
-			<p class="hint">← / → or swipe to page · click or F for fullscreen · esc / swipe ↕ to close</p>
+			<p class="hint">← / → or swipe to page · F for fullscreen · double-click or pinch to zoom · esc / swipe ↕ to close</p>
 		{/if}
 	</aside>
 </article>
@@ -952,10 +1173,136 @@
 		line-height: 1.55;
 		margin: 0 0 1.5rem;
 	}
+	.desc :global(a) {
+		color: var(--accent);
+		word-break: break-word;
+	}
+	/* Shared disclosure pattern — used by Shot details, In albums, In groups,
+	   Comments, and Tags so the right column reads as a stack of consistent
+	   collapsible boxes. */
+	.discl {
+		margin: 1rem 0;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border);
+	}
+	.discl summary {
+		cursor: pointer;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--fg-muted);
+		list-style: none;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		user-select: none;
+		padding: 0.15rem 0;
+	}
+	.discl summary::-webkit-details-marker {
+		display: none;
+	}
+	.discl summary::before {
+		content: '▸';
+		display: inline-block;
+		transition: transform 0.15s;
+		font-size: 0.7rem;
+	}
+	.discl[open] summary::before {
+		transform: rotate(90deg);
+	}
+	.discl summary:hover {
+		color: var(--accent);
+	}
+	.discl-count {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		padding: 0.05rem 0.35rem;
+		border-radius: 8px;
+		color: var(--fg);
+	}
+	.discl-tag {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		color: var(--fg-muted);
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: normal;
+		margin-left: auto;
+	}
+	.shot-dl {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 0.35rem 1rem;
+		margin: 0.75rem 0 0;
+	}
+	.shot-dl dt {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--fg-muted);
+	}
+	.shot-dl dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: #c8c8c8;
+	}
+	.comments-body {
+		margin-top: 0.75rem;
+	}
+	/* Backwards-compat: legacy class names that still appear elsewhere on the
+	   page (e.g. tags-disclosure, tags-count) inherit the new .discl tokens. */
+	.tags-disclosure {
+		margin: 1rem 0;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border);
+	}
+	.tags-disclosure summary {
+		cursor: pointer;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--fg-muted);
+		list-style: none;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		user-select: none;
+		padding: 0.15rem 0;
+	}
+	.tags-disclosure summary::-webkit-details-marker {
+		display: none;
+	}
+	.tags-disclosure summary::before {
+		content: '▸';
+		display: inline-block;
+		transition: transform 0.15s;
+		font-size: 0.7rem;
+	}
+	.tags-disclosure[open] summary::before {
+		transform: rotate(90deg);
+	}
+	.tags-disclosure summary:hover {
+		color: var(--accent);
+	}
+	.tags-count {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		padding: 0.05rem 0.35rem;
+		border-radius: 8px;
+		color: var(--fg);
+	}
 	.tags {
 		list-style: none;
 		padding: 0;
-		margin: 0 0 1.5rem;
+		margin: 0.75rem 0 0;
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.4rem;
@@ -963,11 +1310,22 @@
 	.tags li {
 		font-family: var(--font-mono);
 		font-size: 0.75rem;
-		color: var(--fg-muted);
 		background: var(--bg-elev);
 		border: 1px solid var(--border);
-		padding: 0.15rem 0.5rem;
 		border-radius: 2px;
+		transition: border-color 0.12s;
+	}
+	.tags li:hover {
+		border-color: var(--accent);
+	}
+	.tags li a {
+		display: block;
+		padding: 0.15rem 0.5rem;
+		color: var(--fg-muted);
+		text-decoration: none;
+	}
+	.tags li:hover a {
+		color: var(--accent);
 	}
 	.loc {
 		font-family: var(--font-mono);
@@ -975,38 +1333,30 @@
 		color: var(--fg-muted);
 		margin: 0 0 1.5rem;
 	}
-	.shot,
-	.comments {
-		margin: 1.5rem 0;
-		padding-top: 1rem;
-		border-top: 1px solid var(--border);
+	.context-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
-	.shot h3,
-	.comments h3 {
-		margin: 0 0 0.75rem;
+	.context-list li {
+		font-size: 0.85rem;
+	}
+	.context-list a {
+		color: #d8d8d8;
+		text-decoration: none;
+		border-bottom: 1px solid transparent;
+	}
+	.context-list a:hover {
+		border-bottom-color: var(--accent, #ffae00);
+	}
+	.ctx-count {
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
 		color: var(--fg-muted);
-	}
-	.shot dl {
-		display: grid;
-		grid-template-columns: max-content 1fr;
-		gap: 0.35rem 1rem;
-		margin: 0;
-	}
-	.shot dt {
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		color: var(--fg-muted);
-	}
-	.shot dd {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-		color: #c8c8c8;
+		margin-left: 0.4rem;
 	}
 	.comment {
 		/* Override the generic `article { display: grid }` rule from the page

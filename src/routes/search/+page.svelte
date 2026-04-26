@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	import type { Snapshot } from './$types';
-	import type { FlickrPhotoSummary } from '$lib/server/flickr/types';
+	import type { FlickrPhotoSummary, FlickrGroupSearchResult } from '$lib/server/flickr/types';
 
 	interface SnapState {
 		searchPath: string;
@@ -8,6 +8,8 @@
 		currentPage: number;
 		totalPages: number;
 		total: number | string;
+		groups: FlickrGroupSearchResult[] | null;
+		groupsCollapsed: boolean;
 	}
 	let snapHolder: SnapState | null = null;
 	export const snapshot: Snapshot<SnapState | null> = {
@@ -40,9 +42,17 @@
 		untrack(() => restored?.totalPages ?? data.photos?.pages ?? 1)
 	);
 	let total = $state(untrack(() => restored?.total ?? data.photos?.total ?? 0));
+	let groups = $state<FlickrGroupSearchResult[] | null>(
+		untrack(() => restored?.groups ?? data.groups?.group ?? null)
+	);
+	let groupsCollapsed = $state(untrack(() => restored?.groupsCollapsed ?? false));
 	let loading = $state(false);
 	let lastSearchPath = $state(untrack(() => $page.url.search));
 	let sentinelEl: HTMLElement | null = $state(null);
+	// Counts consecutive pages where Flickr returned photos but all of them
+	// were already in the grid. After ~3 in a row we treat the result set as
+	// exhausted (otherwise we'd recurse forever fetching dup-heavy pages).
+	let consecutiveDupOnlyPages = $state(0);
 
 	function searchPath(): string {
 		return `/search${$page.url.search}`;
@@ -66,13 +76,17 @@
 			currentPage = data.photos?.page ?? 1;
 			totalPages = data.photos?.pages ?? 1;
 			total = data.photos?.total ?? 0;
+			groups = data.groups?.group ?? null;
+			groupsCollapsed = false;
 		}
 		snapHolder = {
 			searchPath: $page.url.search,
 			photos,
 			currentPage,
 			totalPages,
-			total
+			total,
+			groups,
+			groupsCollapsed
 		};
 		if (photos.length > 0) {
 			stashStream(photos.map((p) => p.id));
@@ -88,12 +102,58 @@
 			params.set('page', String(next));
 			const res = await fetch(`/api/search/photos?${params.toString()}`);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const pageData = (await res.json()) as { photo: FlickrPhotoSummary[]; page: number };
-			photos = [...photos, ...pageData.photo];
-			currentPage = pageData.page;
+			const pageData = (await res.json()) as {
+				photo: FlickrPhotoSummary[];
+				page: number;
+				pages?: number;
+				total?: number | string;
+			};
+			const incoming = pageData.photo ?? [];
+			// Flickr can return the same photo across pages (especially under
+			// interestingness-desc, where the result set is non-stable). Dedup
+			// against what we've already shown so Svelte's keyed
+			// {#each photos as p (p.id)} doesn't throw each_key_duplicate.
+			const seen = new Set(photos.map((p) => p.id));
+			const newPhotos = incoming.filter((p) => !seen.has(p.id));
+			photos = [...photos, ...newPhotos];
+			currentPage = pageData.page ?? next;
+			// Refresh pagination metadata from each response — the server-rendered
+			// initial value can be stale or wrong, and we previously relied on it
+			// forever, which is what caused load-more to lock out.
+			if (typeof pageData.pages === 'number') totalPages = pageData.pages;
+			if (pageData.total !== undefined) total = pageData.total;
+
+			// Distinguish "Flickr cap reached" (empty raw response → stop) from
+			// "all dups in this batch" (raw has photos but every one was already
+			// in the grid → keep going, the sentinel won't re-fire on its own
+			// because the grid didn't grow).
+			if (incoming.length === 0) {
+				// Flickr's photos.search caps at ~4000 results / page 40; past
+				// that it returns stat:'ok' with an empty photo[].
+				totalPages = currentPage;
+				consecutiveDupOnlyPages = 0;
+			} else if (newPhotos.length === 0) {
+				consecutiveDupOnlyPages += 1;
+				if (consecutiveDupOnlyPages >= 3) {
+					// Three pages in a row with nothing new — treat as exhausted.
+					totalPages = currentPage;
+					consecutiveDupOnlyPages = 0;
+				} else if (currentPage < totalPages) {
+					// Auto-advance: clear loading, queue the next page on a
+					// microtask so the UI gets a tick before we re-enter.
+					loading = false;
+					queueMicrotask(() => loadMore());
+					return;
+				}
+			} else {
+				consecutiveDupOnlyPages = 0;
+			}
 			stashStream(photos.map((p) => p.id));
 		} catch (err) {
 			console.error('search loadMore failed', err);
+			// Stop pagination on hard error so the IntersectionObserver doesn't
+			// keep retrying the same failing request as the user scrolls.
+			totalPages = currentPage;
 		} finally {
 			loading = false;
 		}
@@ -178,6 +238,48 @@
 		</p>
 	{/if}
 </section>
+
+{#if groups && groups.length > 0}
+	<section class="groups-strip">
+		<button
+			type="button"
+			class="groups-toggle"
+			onclick={() => (groupsCollapsed = !groupsCollapsed)}
+			aria-expanded={!groupsCollapsed}
+		>
+			<span class="chev" class:open={!groupsCollapsed}>▸</span>
+			Groups · {groups.length}{data.groups && Number(data.groups.total) > groups.length
+				? ` of ${Number(data.groups.total).toLocaleString()}`
+				: ''}
+		</button>
+		{#if !groupsCollapsed}
+			<div class="groups-list">
+				{#each groups as g (g.nsid)}
+					<a class="group-card" href="/group/{g.nsid}" title={g.name}>
+						{#if g.iconserver && g.iconserver !== '0'}
+							<img
+								class="group-icon"
+								src="https://farm{g.iconfarm}.staticflickr.com/{g.iconserver}/buddyicons/{g.nsid}.jpg"
+								alt=""
+								loading="lazy"
+							/>
+						{:else}
+							<span class="group-icon placeholder" aria-hidden="true">G</span>
+						{/if}
+						<span class="group-meta">
+							<span class="group-name">{g.name}</span>
+							<span class="group-count">
+								{#if g.members}{Number(g.members).toLocaleString()} members{/if}
+								{#if g.members && g.pool_count} · {/if}
+								{#if g.pool_count}{Number(g.pool_count).toLocaleString()} photos{/if}
+							</span>
+						</span>
+					</a>
+				{/each}
+			</div>
+		{/if}
+	</section>
+{/if}
 
 {#if data.photos && photos.length > 0}
 	<div class="grid">
@@ -297,5 +399,91 @@
 		font-size: 0.78rem;
 		color: var(--fg-muted);
 		padding: 2rem 0 4rem;
+	}
+	.groups-strip {
+		max-width: 80rem;
+		margin: 1.25rem auto 0;
+		padding: 0 1.5rem;
+	}
+	.groups-toggle {
+		background: none;
+		border: none;
+		color: var(--fg-muted);
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		padding: 0.25rem 0;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.groups-toggle:hover {
+		color: var(--fg);
+	}
+	.chev {
+		display: inline-block;
+		transition: transform 0.15s ease;
+	}
+	.chev.open {
+		transform: rotate(90deg);
+	}
+	.groups-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 0.5rem;
+		margin-top: 0.6rem;
+	}
+	.group-card {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.5rem 0.7rem;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		text-decoration: none;
+		color: inherit;
+		min-width: 0;
+		transition: border-color 0.15s ease;
+	}
+	.group-card:hover {
+		border-color: var(--accent);
+	}
+	.group-icon {
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
+		border-radius: 50%;
+		object-fit: cover;
+		background: #222;
+	}
+	.group-icon.placeholder {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--fg-muted);
+	}
+	.group-meta {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		gap: 0.1rem;
+	}
+	.group-name {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: #c8c8c8;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.group-count {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		color: var(--fg-muted);
 	}
 </style>

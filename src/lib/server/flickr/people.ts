@@ -11,6 +11,7 @@ import type {
 const DEFAULT_PER_PAGE = 100;
 const TTL_PERSON = 60 * 60; // 1 hour
 const TTL_PHOTOS = 60; // 1 minute — frequently appended to
+const TTL_POPULAR = 60 * 60; // 1 hour — popularity changes slowly
 
 export async function getPersonInfo(userId: string): Promise<FlickrPersonInfo> {
 	return wrap(key('people.getInfo', { user_id: userId }), TTL_PERSON, async () => {
@@ -20,6 +21,43 @@ export async function getPersonInfo(userId: string): Promise<FlickrPersonInfo> {
 		});
 		return res.person;
 	});
+}
+
+export type PopularSort = 'views' | 'comments' | 'faves' | 'interesting';
+
+interface PopularResponse {
+	stat: string;
+	photos: PhotosPage;
+}
+
+/**
+ * Most popular photos for a user. Backed by `flickr.photos.getPopular`,
+ * which Flickr surfaces sorted by views / faves / comments / interesting.
+ * Cached for an hour because popularity moves slowly.
+ */
+export async function getPopularPhotos(
+	userId: string,
+	sort: PopularSort = 'views',
+	perPage = 12
+): Promise<PhotosPage> {
+	return wrap(
+		key('photos.getPopular', { user_id: userId, sort, per_page: perPage }),
+		TTL_POPULAR,
+		async () => {
+			const res = await flickrMaybeSigned<PopularResponse>({
+				method: 'flickr.photos.getPopular',
+				params: {
+					user_id: userId,
+					sort,
+					per_page: String(perPage),
+					page: '1',
+					safe_search: '3',
+					extras: 'date_taken,views,o_dims,owner_name,path_alias'
+				}
+			});
+			return res.photos;
+		}
+	);
 }
 
 export async function getUserPhotos(

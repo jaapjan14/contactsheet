@@ -4,6 +4,8 @@ import { wrap, key } from '$lib/server/cache';
 import type {
 	GroupsGetInfoResponse,
 	GroupsPoolGetPhotosResponse,
+	GroupsSearchResponse,
+	GroupsPage,
 	UrlsLookupGroupResponse,
 	FlickrGroupInfo,
 	PhotosPage
@@ -45,6 +47,34 @@ const TTL_RESOLVE = 30 * 24 * 60 * 60;
 const TTL_INFO = 24 * 60 * 60;
 const TTL_POOL = 5 * 60;
 const TTL_USER_GROUPS = 5 * 60;
+const TTL_GROUP_SEARCH = 10 * 60;
+
+/**
+ * Search Flickr groups by free text. Cached 10 minutes per query/page combo —
+ * groups don't change rapidly and even short cache massively cuts API load
+ * when a search-page user paginates back and forth.
+ */
+export async function searchGroups(
+	text: string,
+	page = 1,
+	perPage = 24
+): Promise<GroupsPage> {
+	return wrap(
+		key('groups.search', { text, page, per_page: perPage }),
+		TTL_GROUP_SEARCH,
+		async () => {
+			const res = await flickr<GroupsSearchResponse>({
+				method: 'flickr.groups.search',
+				params: {
+					text,
+					per_page: String(perPage),
+					page: String(page)
+				}
+			});
+			return res.groups;
+		}
+	);
+}
 
 /**
  * Resolve a group path-alias or NSID to a stable NSID. Cached 30 days.

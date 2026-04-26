@@ -2,8 +2,137 @@
 
 ## [Unreleased]
 
+### Docs
+
+- **README rewrite** — added a full Flickr API credentials walkthrough
+  (apply page → keys → `.env`), an Architecture Notes section covering the
+  SQLite cache layer, notifications poller, OAuth signer and CSP/auth
+  gate, and an expanded Roadmap split into "Planned" (committed work) and
+  "Considered" (under-discussion ideas: multi-user, public sharable
+  lightbox links, local-image cache, bulk-edit, soft-delete inbox,
+  comparison view, smart albums, Slack/Pushover relay).
+- **Scrubbed deployment specifics** from `README.md` and
+  `docker-compose.qnap.yml` — the SSH user/host/port and NAS-internal path
+  are now `<user>@<nas-host>` / `/path/to/contactsheet/` placeholders so
+  the public repo doesn't advertise one specific homelab's layout.
+
+### Cleanup
+
+- **`/notifications` typecheck warnings cleared** — `item.payload` had been
+  flowing through the page as `unknown`, breaking the inferred parameter
+  type for `thumbUrl()` and the `dateadded` access. Routed both through the
+  already-aliased `{@const p}` cast inside the `{#each}`. Initial
+  `let items = $state(...)` now wraps the source read in `untrack` so
+  svelte-check stops asking whether it should be a derived (it shouldn't —
+  the page mutates `items` independently after first render).
+- **Removed unused CSS selectors** in `src/routes/photo/[id]/+page.svelte`
+  — `.shot`, `.comments`, `.contexts`, and their descendant rules were
+  leftover from before the disclosure-row refactor. Net result: zero
+  errors, zero warnings on `npx svelte-check`.
+
 ### Added
 
+- **Notification rows link to the user's photostream.** In the bell dropdown
+  and on `/notifications`, the username on a "X faved your photo" /
+  "X commented" item is now an accent-coloured link to `/user/{nsid}/photostream`,
+  so you can jump straight to the person's feed. The photo title remains the
+  primary click target into `/photo/{id}`. Restructured the row from one
+  outer `<a>` to a flex container with a thumb-anchor + inline content
+  anchors so the two destinations can coexist without nested `<a>` tags.
+- **Search now also returns Flickr groups.** The `/search` page calls
+  `flickr.groups.search` in parallel with the photo search whenever the query
+  has free text, and renders matching groups in a collapsible strip above the
+  photo grid. Each card shows the group's buddy icon, name, member count, and
+  pool size, and links into the existing in-app `/group/{nsid}` view rather
+  than out to flickr.com. New endpoint at `/api/search/groups`. Groups results
+  are cached 10 min server-side. `searchGroups()` lives in
+  `src/lib/server/flickr/groups.ts`; types in `src/lib/server/flickr/types.ts`.
+
+### Fixed
+
+- **Closing fullscreen now lands on the photo info page, not the grid.** ✕,
+  swipe-↕, and wheel-up-to-close used to skip past the un-fullscreen state
+  and bounce all the way to the grid in a single action. They now follow
+  the same cascade Esc has always used: zoom → exit fullscreen → close to
+  grid. A second dismiss from the info page still goes to the grid. The
+  sidebar "← Back to {context}" link is unchanged (always grid).
+- **Photo description renders HTML instead of escaping it.** Flickr ships
+  descriptions as HTML (mostly `<a>`/`<br>` plus entity-encoded chars), but
+  the photo page was rendering them as literal text, so links to the
+  photographer's Instagram etc. came through as visible
+  `<a href="...">Instagram</a>` source. Same `decodeFlickrEntities` →
+  `sanitizeFlickrHtml` → `{@html}` pipeline already used on the user About
+  page, plus matching accent-coloured link styling.
+- **Safari now actually shows the high-res image when zoomed.** The zoom
+  controller used to set `will-change: transform` permanently on the
+  `<img>`; this is fine on Firefox but on Safari it pins the element to a
+  composited layer rasterized at element layout size (2048 px), so even
+  with the Original src, transform-scaling just GPU-upscaled the same
+  2048-pixel bitmap → no sharpness gain. `will-change` is now applied only
+  during an active gesture and cleared after a 220 ms settle, so static
+  zoom states re-rasterize from the high-res source — Safari behaviour now
+  matches Firefox.
+- **HTML responses no longer cache at the edge.** Cloudflare was holding
+  page HTML for ~2 hr by default, which meant a fresh container could
+  still serve the old hashed JS bundle URL and "I just deployed" never
+  actually reached the browser. `hooks.server.ts` now sets `Cache-Control:
+  no-store, must-revalidate` for everything except `/_app/immutable/**`
+  (which is content-addressable and safe to cache aggressively).
+- **Right-column disclosures default to closed on a fresh photo.** "Shot
+  details" and "Comments" used to spring open on load, pushing the rest of
+  the column down. Both now default to collapsed; user expands what they
+  want.
+- **High-res image swap on zoom now actually sticks**, with a two-tier
+  progressive enhancement so we match Flickr's own viewer pixel-for-pixel:
+  - Root cause was reactive: the lightbox `<img>` binds `src={display.source}`,
+    so the previous imperative `target.src = highResUrl` was being clobbered
+    back to the 2048 display URL on the very next reactive tick. Replaced
+    with a reactive `imgSrc` derived gated on a stage state machine.
+  - Stage 1 — `highRes`: X-Large 6K (~1–3 MB) preloads on enter-fullscreen
+    and swaps in within ~1 sec.
+  - Stage 2 — `maxRes`: Original (often 15–40 MB) preloads in the background
+    once stage 1 completes, then swaps in. This unblocks the initial
+    sharpness boost behind the long Original download but still ends up at
+    full pixel parity with flickr.com when zooming side-by-side.
+  - Added `onerror` logging for both stages so future preload failures
+    aren't silent.
+- **Hydration restored** (regression from earlier in this changelog). The
+  CSP I added in `hooks.server.ts` was overwriting the nonce-bearing CSP
+  that SvelteKit auto-generates from `kit.csp.directives`, which silently
+  blocked the inline hydration script. Result: pages rendered server-side
+  but client-side JS never ran — manifesting as "infinite scroll stopped"
+  / "no interactivity". Reverted to relying on svelte.config.js's CSP and
+  kept only the `Content-Security-Policy-Report-Only` clobber for the
+  Cloudflare edge-injected report-only noise.
+
+- **Zoom controller hardening** (`src/lib/zoom.ts`): added `ResizeObserver` on
+  the parent so resizing the window / rotating the device while zoomed re-clamps
+  the image (without it, the image could slide off-screen and stay there).
+  Normalized `WheelEvent.deltaMode` so Firefox line-mode and old page-mode
+  configs zoom/pan at the same speed as pixel-mode. Reset transform before
+  paging so View Transitions snapshots aren't taken mid-zoom.
+- **iOS double-tap zoom**: iOS Safari doesn't fire `dblclick` when pointer
+  capture is active on the target, so manual time + distance double-tap
+  detection in `pointerdown` for `pointerType === 'touch'`. Mouse keeps using
+  the native `dblclick` event.
+- **Pinch on iPhone no longer triggers swipe-close.** When two fingers from a
+  pinch lift in different order, `changedTouches[0]` could measure (finger #2's
+  end − finger #1's start), producing a large pseudo-swipe that fired the
+  close-on-vertical-swipe handler. The lightbox now flags any multi-touch
+  during a stroke and bails on the swipe interpretation.
+
+### Added
+
+- **Pinch / wheel / drag zoom in fullscreen** (`src/lib/zoom.ts`,
+  `src/routes/photo/[id]/+page.svelte`): a framework-agnostic zoom controller
+  attaches to the lightbox image when fullscreen is active. ctrl+wheel
+  (and macOS trackpad pinch) zooms toward the cursor; two-finger pinch zooms
+  toward the gesture midpoint; one-finger drag pans when zoomed; double-click
+  toggles 1× ↔ 2.5× anchored at the cursor. Esc reset → exit fullscreen →
+  close, in that order. Swipe-paging and click-to-exit-fullscreen are
+  suppressed while zoomed so a pan can't be reinterpreted as paging. The
+  controller (`makeZoomer(imgEl)`) has no SvelteKit dependencies and is
+  designed to drop straight into Darkroom Log's fullscreen view.
 - Initial scaffold: SvelteKit 2 + Svelte 5 (TypeScript), Node adapter, Prettier
 - Flickr API client with hand-rolled OAuth 1.0a HMAC-SHA1 signer
   (`src/lib/server/flickr/oauth.ts`, `src/lib/server/flickr/client.ts`)

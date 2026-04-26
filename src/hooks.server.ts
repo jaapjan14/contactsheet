@@ -1,5 +1,10 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { isSessionValid, SESSION_COOKIE } from '$lib/server/session';
+import { startNotificationsPoller } from '$lib/server/notifications/poller';
+
+// Start the background notifications poller on server boot. Idempotent —
+// the function itself guards against double-start across HMR.
+startNotificationsPoller();
 
 // Routes reachable WITHOUT a valid session cookie.
 // /login (GET form + POST action) and the SvelteKit static assets are the
@@ -31,6 +36,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const response = await resolve(event);
 
+	// Force-fresh HTML on every navigation. Cloudflare otherwise caches HTML
+	// at the edge for ~2 hours by default, which means a freshly deployed
+	// container can still serve users an old hashed JS bundle reference and
+	// the new code is never loaded. Hashed `/_app/immutable/**` assets are
+	// content-addressable so they're safe to cache aggressively (and they
+	// already advertise that themselves).
+	const isImmutable = path.startsWith('/_app/immutable/');
+	if (!isImmutable) {
+		response.headers.set('Cache-Control', 'no-store, must-revalidate');
+	}
+
 	// Security headers
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('X-Frame-Options', 'DENY');
@@ -40,6 +56,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()'
 	);
 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+
+	// NOTE: the actual Content-Security-Policy is set by SvelteKit from
+	// `kit.csp.directives` in svelte.config.js — it injects a per-request
+	// nonce into script-src so the inline hydration script can run. DO NOT
+	// override `Content-Security-Policy` here; doing so strips the nonce
+	// and the page fails to hydrate (manifesting as "infinite scroll
+	// stopped working" / "all client-side interactivity is dead").
+	//
+	// We do still clobber `Content-Security-Policy-Report-Only`: Cloudflare
+	// can inject a strict report-only at the edge that floods the console
+	// with "[Report Only] Refused to connect" for our own /api/* calls.
+	response.headers.set('Content-Security-Policy-Report-Only', "default-src 'self' *");
 
 	const forwardedProto = event.request.headers.get('x-forwarded-proto');
 	const isHttps = forwardedProto === 'https' || event.url.protocol === 'https:';

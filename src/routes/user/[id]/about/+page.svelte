@@ -90,6 +90,26 @@
 		<dt>Flickr profile</dt>
 		<dd><a href={flickrProfileUrl} target="_blank" rel="noopener noreferrer">{flickrProfileUrl}</a></dd>
 	</dl>
+
+	{#if data.popular && data.popular.photo.length > 0}
+		<section class="popular">
+			<h2>Most popular</h2>
+			<div class="popular-grid">
+				{#each data.popular.photo as p (p.id)}
+					<a class="popular-cell" href="/photo/{p.id}" title={p.title}>
+						<img
+							loading="lazy"
+							src="https://live.staticflickr.com/{p.server}/{p.id}_{p.secret}_q.jpg"
+							alt={p.title}
+						/>
+						{#if p.views !== undefined}
+							<span class="views">{Number(p.views).toLocaleString()} views</span>
+						{/if}
+					</a>
+				{/each}
+			</div>
+		</section>
+	{/if}
 </section>
 
 <style>
@@ -137,6 +157,54 @@
 		color: #c8c8c8;
 		word-break: break-word;
 	}
+	.popular {
+		margin: 2rem 0 0;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--border);
+	}
+	.popular h2 {
+		margin: 0 0 0.75rem;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--fg-muted);
+	}
+	.popular-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 4px;
+	}
+	.popular-cell {
+		position: relative;
+		display: block;
+		aspect-ratio: 1 / 1;
+		overflow: hidden;
+		background: #111;
+		border-radius: 2px;
+	}
+	.popular-cell img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+		transition: transform 0.2s;
+	}
+	.popular-cell:hover img {
+		transform: scale(1.04);
+	}
+	.popular-cell .views {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		padding: 0.25rem 0.4rem;
+		background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		color: #fff;
+	}
 	@media (max-width: 640px) {
 		.about {
 			padding: 0 1rem;
@@ -150,6 +218,9 @@
 		}
 		.facts dt:first-of-type {
 			margin-top: 0;
+		}
+		.popular-grid {
+			grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 		}
 	}
 </style>
