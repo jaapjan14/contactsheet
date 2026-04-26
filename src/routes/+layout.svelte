@@ -1,10 +1,13 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import { onNavigate } from '$app/navigation';
+	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
+
+	const isLoginPage = $derived($page.url.pathname === '/login');
 
 	onNavigate((navigation) => {
 		if (typeof document === 'undefined' || !('startViewTransition' in document)) return;
@@ -30,6 +33,7 @@
 	<title>ContactSheet</title>
 </svelte:head>
 
+{#if !isLoginPage}
 <header>
 	<a href="/" class="brand">ContactSheet</a>
 	<span class="tagline">a contact sheet for Flickr</span>
@@ -49,12 +53,16 @@
 			{data.me.fullname || data.me.username}
 		</a>
 		<form method="POST" action="/auth/logout" class="logout-form">
-			<button type="submit" class="logout">log out</button>
+			<button type="submit" class="logout" title="Sign out of Flickr">flickr →</button>
 		</form>
 	{:else}
 		<a href="/auth/start" class="signin">sign in to Flickr</a>
 	{/if}
+	<form method="POST" action="/logout" class="logout-form">
+		<button type="submit" class="logout" title="Lock ContactSheet (clears app session)">🔒</button>
+	</form>
 </header>
+{/if}
 
 {@render children()}
 
