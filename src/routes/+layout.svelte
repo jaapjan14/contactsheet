@@ -48,8 +48,18 @@
 	</form>
 	<span class="spacer"></span>
 	{#if data.me}
-		<a href="/user/{data.me.username}/photostream" class="me">
+		<a
+			href="/user/{data.me.username}/photostream"
+			class="me"
+			title="Signed in to Flickr — go to your photostream"
+		>
+			<span class="me-dot" aria-hidden="true"></span>
 			{data.me.fullname || data.me.username}
+		</a>
+	{:else}
+		<a href="/auth/start" class="me me-signin" title="Sign in to Flickr">
+			<span class="me-dot off" aria-hidden="true"></span>
+			Sign in to Flickr
 		</a>
 	{/if}
 
@@ -154,17 +164,34 @@
 		border-color: var(--accent);
 	}
 	.me {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
 		font-family: var(--font-mono);
 		font-size: 0.9rem;
 		font-weight: 500;
 		color: var(--fg);
-		padding: 0.15rem 0.5rem;
+		padding: 0.2rem 0.6rem;
 		border: 1px solid var(--border);
 		border-radius: 3px;
 	}
 	.me:hover {
 		border-color: var(--accent);
 		text-decoration: none;
+	}
+	.me-signin {
+		color: var(--accent);
+	}
+	.me-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #5fb555; /* connected */
+		flex-shrink: 0;
+	}
+	.me-dot.off {
+		background: #555; /* not connected */
+		border: 1px solid var(--fg-muted);
 	}
 	/* Overflow menu (⋯) */
 	.menu {
