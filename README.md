@@ -7,6 +7,19 @@ photographer actually wants to scan photos.
 
 Sibling tool to Darkroom Log — same aesthetic family (IBM Plex, dark UI).
 
+![ContactSheet photostream](screenshots/01-photostream.png)
+
+The photo detail page surfaces EXIF, comments, fave/fave-count, location, plus collapsible
+"In albums" / "In groups" / "Tags" disclosures — all in one place, all in-app (album and group
+links route to ContactSheet's own views, not flickr.com).
+
+![Photo detail with disclosures](screenshots/02-photo-detail.png)
+
+Search returns matching Flickr **groups** alongside photos, so you can jump from a query into
+a community as easily as into a single image.
+
+![Search with groups strip](screenshots/03-search-with-groups.png)
+
 ## Stack
 
 - SvelteKit 2 + Svelte 5 (TypeScript), Node adapter
