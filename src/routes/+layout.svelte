@@ -265,9 +265,6 @@
 		.tagline {
 			display: none;
 		}
-		.spacer {
-			display: none;
-		}
 		.search {
 			order: 10;
 			flex-basis: 100%;
@@ -279,7 +276,7 @@
 			font-size: 0.9rem;
 		}
 		.me {
-			max-width: 7rem;
+			max-width: 9rem;
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
