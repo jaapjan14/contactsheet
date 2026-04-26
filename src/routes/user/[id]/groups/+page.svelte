@@ -33,7 +33,11 @@
 	isSelf={data.me?.nsid === data.user.nsid}
 />
 
-{#if data.groups.length === 0}
+{#if data.needsFlickrAuth}
+	<p class="empty">
+		<a href="/auth/start">Sign in to Flickr</a> to view group memberships.
+	</p>
+{:else if data.groups.length === 0}
 	<p class="empty">Not a member of any public groups.</p>
 {:else}
 	<div class="toolbar">

@@ -202,11 +202,13 @@
 			padding: 0.55rem 0.75rem;
 			font-size: 0.9rem;
 		}
-		/* Explore drops to its own row beneath the search bar */
+		/* Explore drops to its own row beneath the search bar (because search
+		   takes the full row above it), but Explore itself only claims as
+		   much width as its text — the tap target stays just the link. */
 		.nav-link {
 			order: 11;
-			flex-basis: 100%;
-			padding: 0.1rem 0;
+			padding: 0.2rem 0;
+			align-self: flex-start;
 		}
 		.me {
 			max-width: 7rem;

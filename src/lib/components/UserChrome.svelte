@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { avatarUrl } from '$lib/flickr/urls';
 	import type { FlickrPersonInfo } from '$lib/server/flickr/types';
 
@@ -19,10 +20,10 @@
 	interface Tab {
 		slug: string;
 		label: string;
-		disabled?: boolean;
 	}
 
 	const tabs = $derived<Tab[]>([
+		{ slug: 'about', label: 'About' },
 		{ slug: 'photostream', label: 'Photostream' },
 		{ slug: 'albums', label: 'Albums' },
 		{ slug: 'faves', label: 'Faves' },
@@ -35,6 +36,11 @@
 				]
 			: [])
 	]);
+
+	function navTab(e: Event) {
+		const slug = (e.target as HTMLSelectElement).value;
+		if (slug && slug !== activeTab) goto(`/user/${userKey}/${slug}`);
+	}
 </script>
 
 <header class="user-header">
@@ -48,21 +54,27 @@
 	</div>
 </header>
 
+<!-- Desktop: horizontal tab bar.  Hidden on ≤640px. -->
 <nav class="user-nav">
-	{#each tabs as tab}
-		{#if tab.disabled}
-			<span class="tab disabled">{tab.label}</span>
-		{:else}
-			<a
-				class="tab"
-				class:active={tab.slug === activeTab}
-				href="/user/{userKey}/{tab.slug}"
-			>
-				{tab.label}
-			</a>
-		{/if}
+	{#each tabs as tab (tab.slug)}
+		<a
+			class="tab"
+			class:active={tab.slug === activeTab}
+			href="/user/{userKey}/{tab.slug}"
+		>
+			{tab.label}
+		</a>
 	{/each}
 </nav>
+
+<!-- Mobile: native <select>.  Compact, no horizontal-scroll-hidden-affordance. -->
+<div class="user-nav-select">
+	<select aria-label="Section" value={activeTab} onchange={navTab}>
+		{#each tabs as tab (tab.slug)}
+			<option value={tab.slug} selected={tab.slug === activeTab}>{tab.label}</option>
+		{/each}
+	</select>
+</div>
 
 <style>
 	.user-header {
@@ -99,11 +111,8 @@
 		margin: 0 auto;
 		padding: 0 1.5rem;
 		border-bottom: 1px solid var(--border);
-		/* Horizontal scroll when the 7 tabs don't fit (mobile). Hides the
-		   scrollbar; touch / two-finger swipe still scrolls. */
 		overflow-x: auto;
 		scrollbar-width: none;
-		-webkit-overflow-scrolling: touch;
 	}
 	.user-nav::-webkit-scrollbar {
 		display: none;
@@ -122,37 +131,64 @@
 		color: var(--fg);
 		border-bottom-color: var(--accent);
 	}
-	.tab.disabled {
-		color: #444;
-		cursor: not-allowed;
-	}
-	.tab:not(.disabled):hover {
+	.tab:hover {
 		color: var(--fg);
 		text-decoration: none;
 	}
+	.user-nav-select {
+		display: none;
+	}
+
 	@media (max-width: 640px) {
 		.user-header {
-			margin: 1rem auto 0.75rem;
+			margin: 0.5rem auto 0.5rem;
 			padding: 0 1rem;
-			gap: 0.75rem;
+			gap: 0.65rem;
 		}
 		.avatar {
-			width: 48px;
-			height: 48px;
+			width: 40px;
+			height: 40px;
 		}
 		.who h1 {
-			font-size: 1.15rem;
+			font-size: 1.05rem;
 		}
 		.meta {
-			font-size: 0.75rem;
+			font-size: 0.72rem;
+			margin-top: 0.1rem;
 		}
+
+		/* Swap the tab bar for a native <select> */
 		.user-nav {
-			padding: 0 1rem;
-			gap: 1.1rem;
+			display: none;
 		}
-		.tab {
+		.user-nav-select {
+			display: flex;
+			max-width: 80rem;
+			margin: 0 auto;
+			padding: 0.4rem 1rem 0.6rem;
+			border-bottom: 1px solid var(--border);
+		}
+		.user-nav-select select {
+			flex: 1;
+			background: var(--bg-elev);
+			border: 1px solid var(--border);
+			color: var(--fg);
+			padding: 0.5rem 0.7rem;
+			padding-right: 2rem;
+			font-family: var(--font-sans);
 			font-size: 0.9rem;
-			padding: 0.6rem 0;
+			border-radius: 3px;
+			outline: none;
+			appearance: none;
+			-webkit-appearance: none;
+			cursor: pointer;
+			background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='%23888' d='M1 1l5 5 5-5'/></svg>");
+			background-repeat: no-repeat;
+			background-position: right 0.7rem center;
+			background-size: 0.7rem;
+		}
+		.user-nav-select select:focus {
+			border-color: var(--accent);
 		}
 	}
 </style>

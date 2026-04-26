@@ -2,8 +2,6 @@ import { error } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { resolveUserId } from '$lib/server/flickr/users';
 import { getPersonInfo } from '$lib/server/flickr/people';
-import { getUserGroups } from '$lib/server/flickr/groups';
-import type { FlickrUserGroup } from '$lib/server/flickr/groups';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -18,26 +16,9 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	const user = await getPersonInfo(userId);
-
-	let groups: FlickrUserGroup[] = [];
-	let needsFlickrAuth = false;
-	try {
-		groups = await getUserGroups(userId);
-	} catch (err) {
-		if (err instanceof FlickrError) {
-			// flickr.people.getGroups requires authentication; if we don't have
-			// a token (or Flickr otherwise rejects), surface a notice instead of
-			// hard-redirecting to the OAuth flow.
-			needsFlickrAuth = true;
-		} else {
-			throw err;
-		}
-	}
-
 	return {
 		userKey: params.id,
-		user,
-		groups,
-		needsFlickrAuth
+		userId,
+		user
 	};
 };

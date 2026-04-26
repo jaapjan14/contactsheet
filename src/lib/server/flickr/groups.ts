@@ -1,5 +1,5 @@
 import { flickr } from './client';
-import { flickrAuth, flickrMaybeSigned } from './authenticated';
+import { flickrMaybeSigned } from './authenticated';
 import { wrap, key } from '$lib/server/cache';
 import type {
 	GroupsGetInfoResponse,
@@ -23,13 +23,15 @@ interface PeopleGetGroupsResponse {
 }
 
 /**
- * `flickr.people.getGroups` requires authentication even for reading public info,
- * so this delegates to flickrAuth — which redirects to /auth/start if the
- * viewer isn't signed in. Cached 5 minutes.
+ * `flickr.people.getGroups` requires authentication. We delegate to
+ * flickrMaybeSigned so authed sessions get the list, and unsigned sessions
+ * get a Flickr error that the route can catch and render gracefully —
+ * rather than the old behavior of forcibly redirecting to Flickr OAuth on
+ * every Groups-tab click. Cached 5 minutes.
  */
 export async function getUserGroups(userId: string): Promise<FlickrUserGroup[]> {
 	return wrap(key('people.getGroups', { user_id: userId }), TTL_USER_GROUPS, async () => {
-		const res = await flickrAuth<PeopleGetGroupsResponse>({
+		const res = await flickrMaybeSigned<PeopleGetGroupsResponse>({
 			method: 'flickr.people.getGroups',
 			params: { user_id: userId }
 		});
