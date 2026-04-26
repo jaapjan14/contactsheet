@@ -202,6 +202,12 @@
 			padding: 0.55rem 0.75rem;
 			font-size: 0.9rem;
 		}
+		/* Explore drops to its own row beneath the search bar */
+		.nav-link {
+			order: 11;
+			flex-basis: 100%;
+			padding: 0.1rem 0;
+		}
 		.me {
 			max-width: 7rem;
 			overflow: hidden;

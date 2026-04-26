@@ -192,8 +192,14 @@
 	}
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-		gap: 4px;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 2px;
+	}
+	@media (min-width: 600px) {
+		.grid {
+			grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+			gap: 4px;
+		}
 	}
 	.cell {
 		display: block;

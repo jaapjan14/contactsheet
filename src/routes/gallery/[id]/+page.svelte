@@ -167,11 +167,19 @@
 	}
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 4px;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 2px;
 		max-width: 80rem;
-		margin: 1.5rem auto;
-		padding: 0 1.5rem;
+		margin: 0.75rem auto;
+		padding: 0;
+	}
+	@media (min-width: 600px) {
+		.grid {
+			grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+			gap: 4px;
+			margin: 1.5rem auto;
+			padding: 0 1.5rem;
+		}
 	}
 	.cell {
 		display: block;
