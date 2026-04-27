@@ -30,3 +30,20 @@ export function photoPageHref(photoId: string): string {
 export function userPageHref(userId: string, tab = 'photostream'): string {
 	return `/user/${encodeURIComponent(userId)}/${tab}`;
 }
+
+// Flickr's short URL — base58 of the photo id, prefixed with `flic.kr/p/`.
+// The alphabet skips visually ambiguous characters (0/O, l/I).
+const FLICKR_BASE58 =
+	'123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+
+export function flickrShortUrl(photoId: string): string {
+	let n = BigInt(photoId);
+	if (n <= 0n) return `https://flic.kr/p/${photoId}`;
+	const base = BigInt(FLICKR_BASE58.length);
+	let out = '';
+	while (n > 0n) {
+		out = FLICKR_BASE58[Number(n % base)] + out;
+		n /= base;
+	}
+	return `https://flic.kr/p/${out}`;
+}

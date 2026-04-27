@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { onCellClick } from '$lib/photo-overlay';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -88,7 +89,12 @@
 				{@const uHref = userHref(p)}
 				<li class:unseen={item.seen_at === null}>
 					<div class="card">
-						<a class="thumb-anchor" href="/photo/{photoId}" aria-label="Open photo">
+						<a
+							class="thumb-anchor"
+							href="/photo/{photoId}"
+							aria-label="Open photo"
+							onclick={(e) => onCellClick(e, photoId as string)}
+						>
 							{#if thumbUrl(p)}
 								<img class="thumb" src={thumbUrl(p)} alt="" />
 							{:else}

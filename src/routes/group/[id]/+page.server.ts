@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { resolveGroupId, getGroupInfo, getGroupPhotos } from '$lib/server/flickr/groups';
+import { searchPhotos } from '$lib/server/flickr/search';
 import type { PhotosPage } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
@@ -12,7 +13,7 @@ const EMPTY_POOL: PhotosPage = {
 	photo: []
 };
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
 	let groupId: string;
 	try {
 		groupId = await resolveGroupId(params.id);
@@ -35,13 +36,16 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw err;
 	}
 
-	// Pool is allowed to fail — some private/members-only pools 4xx even when
-	// info is readable. Render the page with empty photos + a friendly notice
-	// instead of 500'ing.
+	// `?q=…` switches the grid into in-group search mode (photos.search scoped
+	// to this group_id). Empty/missing q falls back to the regular pool listing.
+	const q = (url.searchParams.get('q') ?? '').trim();
+
 	let photos: PhotosPage = EMPTY_POOL;
 	let poolError: string | null = null;
 	try {
-		photos = await getGroupPhotos(groupId, 1);
+		photos = q
+			? await searchPhotos({ groupId, text: q, page: 1, sort: 'relevance' })
+			: await getGroupPhotos(groupId, 1);
 	} catch (err) {
 		if (err instanceof FlickrError) {
 			poolError = err.message;
@@ -55,6 +59,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		groupId,
 		group: info,
 		photos,
-		poolError
+		poolError,
+		query: q
 	};
 };

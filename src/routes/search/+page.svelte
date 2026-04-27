@@ -24,6 +24,7 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { photoUrl } from '$lib/flickr/urls';
+	import { onCellClick } from '$lib/photo-overlay';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -47,7 +48,7 @@
 	);
 	let groupsCollapsed = $state(untrack(() => restored?.groupsCollapsed ?? false));
 	let loading = $state(false);
-	let lastSearchPath = $state(untrack(() => $page.url.search));
+	let lastSearchPath = $state<string>(untrack(() => $page.url.search));
 	let sentinelEl: HTMLElement | null = $state(null);
 	// Counts consecutive pages where Flickr returned photos but all of them
 	// were already in the grid. After ~3 in a row we treat the result set as
@@ -192,12 +193,19 @@
 </script>
 
 <section class="search-header">
+	<h1 class="page-title">Search</h1>
+	<p class="page-blurb">
+		Searches all of Flickr — returns matching <strong>photos</strong> and
+		<strong>groups</strong> in one page. To search inside a single album, group,
+		or user's photostream, open that page and use the search box there.
+	</p>
+
 	<form method="get" action="/search">
 		<input
 			class="qbox"
 			name="q"
 			type="search"
-			placeholder="Search Flickr…"
+			placeholder="Text — title, description, tags…"
 			value={data.query.q}
 			autocomplete="off"
 		/>
@@ -205,7 +213,7 @@
 			class="ubox"
 			name="user"
 			type="search"
-			placeholder="user (optional)"
+			placeholder="By user (URL or screen-name)"
 			value={data.query.user}
 			autocomplete="off"
 		/>
@@ -213,7 +221,7 @@
 			class="tbox"
 			name="tags"
 			type="search"
-			placeholder="tags, comma-separated"
+			placeholder="Tags only (comma-separated)"
 			value={data.query.tags}
 			autocomplete="off"
 		/>
@@ -224,17 +232,20 @@
 		</select>
 		<button type="submit">Search</button>
 	</form>
+	<p class="form-help">
+		<strong>Text</strong> matches title, description, and tags.
+		<strong>By&nbsp;user</strong> and <strong>Tags</strong> narrow the
+		<em>photo</em> results only — group results always come from the text box.
+	</p>
 
 	{#if data.photos}
 		<p class="meta">
-			{Number(data.photos.total).toLocaleString()} results
-			{#if data.query.user} · in <code>{data.query.user}</code>{/if}
+			{Number(data.photos.total).toLocaleString()} photo results
+			{#if data.query.user} · by <code>{data.query.user}</code>{/if}
 			{#if data.query.tags} · tags: <code>{data.query.tags}</code>{/if}
-		</p>
-	{:else}
-		<p class="meta">
-			Search Flickr by text, user, tags, or any combination. Results work like the rest of
-			ContactSheet — click a thumbnail, page with arrows, close to come back here.
+			{#if data.groups && data.groups.group.length > 0}
+				· {Number(data.groups.total).toLocaleString()} group{Number(data.groups.total) === 1 ? '' : 's'} matched
+			{/if}
 		</p>
 	{/if}
 </section>
@@ -284,13 +295,13 @@
 {#if data.photos && photos.length > 0}
 	<div class="grid">
 		{#each photos as p (p.id)}
-			<a class="cell" href="/photo/{p.id}" title={p.title}>
-				<img
-					src={photoUrl(p, 'z')}
-					alt={p.title}
-					loading="lazy"
-					style="view-transition-name: photo-{p.id};"
-				/>
+			<a
+				class="cell"
+				href="/photo/{p.id}"
+				title={p.title}
+				onclick={(e) => onCellClick(e, p.id)}
+			>
+				<img src={photoUrl(p, 'z')} alt={p.title} loading="lazy" />
 			</a>
 		{/each}
 	</div>
@@ -311,6 +322,40 @@
 		max-width: 80rem;
 		margin: 1.5rem auto;
 		padding: 0 1.5rem;
+	}
+	.page-title {
+		font-family: var(--font-sans);
+		font-weight: 500;
+		font-size: 1.5rem;
+		letter-spacing: -0.01em;
+		margin: 0 0 0.35rem;
+	}
+	.page-blurb {
+		margin: 0 0 1rem;
+		color: var(--fg-muted);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		max-width: 100ch;
+		line-height: 1.5;
+	}
+	.page-blurb strong {
+		color: var(--fg);
+		font-weight: 500;
+	}
+	.form-help {
+		margin: 0.6rem 0 0;
+		color: var(--fg-muted);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		line-height: 1.5;
+	}
+	.form-help strong {
+		color: #c8c8c8;
+		font-weight: 500;
+	}
+	.form-help em {
+		font-style: italic;
+		color: #c8c8c8;
 	}
 	form {
 		display: grid;

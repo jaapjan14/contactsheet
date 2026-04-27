@@ -17,7 +17,14 @@ export type SearchSort =
 export interface SearchOptions {
 	text?: string;
 	userId?: string;
+	groupId?: string;
 	tags?: string;
+	/**
+	 * Restrict results to your Flickr contacts. `all` = everyone you follow,
+	 * `ff` = friends + family only. Requires an authenticated call — Flickr
+	 * silently returns nothing if unsigned.
+	 */
+	contacts?: 'all' | 'ff';
 	sort?: SearchSort;
 	page?: number;
 	perPage?: number;
@@ -46,6 +53,8 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 	};
 	if (opts.text) params.text = opts.text;
 	if (opts.userId) params.user_id = opts.userId;
+	if (opts.groupId) params.group_id = opts.groupId;
+	if (opts.contacts) params.contacts = opts.contacts;
 	if (opts.tags) {
 		params.tags = opts.tags;
 		params.tag_mode = 'all';
@@ -54,6 +63,8 @@ export async function searchPhotos(opts: SearchOptions): Promise<PhotosPage> {
 		key('photos.search', {
 			text: opts.text,
 			user_id: opts.userId,
+			group_id: opts.groupId,
+			contacts: opts.contacts,
 			tags: opts.tags,
 			sort: opts.sort ?? 'relevance',
 			page: opts.page ?? 1,

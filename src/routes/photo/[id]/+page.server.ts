@@ -8,6 +8,8 @@ import {
 	getPhotoFavoritesCount,
 	getPhotoContexts
 } from '$lib/server/flickr/photos';
+import { getUserGroups, type FlickrUserGroup } from '$lib/server/flickr/groups';
+import { readAuth } from '$lib/server/auth/store';
 import type { FlickrSizeEntry } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
@@ -63,13 +65,15 @@ function pickMaxResSize(
 
 export const load: PageServerLoad = async ({ params }) => {
 	try {
-		const [photo, sizes, exif, comments, favesCount, contexts] = await Promise.all([
+		const auth = await readAuth();
+		const [photo, sizes, exif, comments, favesCount, contexts, myGroups] = await Promise.all([
 			getPhotoInfo(params.id),
 			getPhotoSizes(params.id),
 			getPhotoExif(params.id),
 			getPhotoComments(params.id),
 			getPhotoFavoritesCount(params.id),
-			getPhotoContexts(params.id)
+			getPhotoContexts(params.id),
+			auth ? getUserGroups(auth.nsid).catch((): FlickrUserGroup[] => []) : Promise.resolve([] as FlickrUserGroup[])
 		]);
 
 		const display = pickDisplaySize(sizes);
@@ -77,15 +81,21 @@ export const load: PageServerLoad = async ({ params }) => {
 		const highRes = pickHighResSize(sizes, display);
 		const maxRes = pickMaxResSize(sizes, highRes);
 
+		// Photo-media sizes only — used by the BBCode share picker. Drop video
+		// renditions (they have media === 'video') so the menu is clean.
+		const photoSizes = sizes.filter((s) => s.media === 'photo');
+
 		return {
 			photo,
 			display,
 			highRes,
 			maxRes,
+			photoSizes,
 			exif,
 			comments,
 			favesCount,
-			contexts
+			contexts,
+			myGroups
 		};
 	} catch (err) {
 		if (err instanceof FlickrError) {

@@ -38,6 +38,9 @@ export interface FlickrPhotoSummary {
 	isfriend?: number;
 	isfamily?: number;
 	datetaken?: string;
+	dateupload?: string;
+	ownername?: string;
+	pathalias?: string | null;
 	views?: string;
 	tags?: string;
 	url_z?: string;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { avatarUrl } from '$lib/flickr/urls';
 	import type { FlickrPersonInfo } from '$lib/server/flickr/types';
@@ -16,6 +17,53 @@
 		subtitle: string;
 		isSelf?: boolean;
 	} = $props();
+
+	// Follow indicator: lazy-fetched after mount because contacts.getList is
+	// auth-only and we don't want to block any user page on it. The endpoint
+	// gracefully reports { signedIn: false } for anonymous viewers, in which
+	// case we render nothing.
+	type FollowState = {
+		signedIn: boolean;
+		following: boolean;
+		isSelf: boolean;
+	};
+	let followState = $state<FollowState | null>(null);
+	const flickrPeopleUrl = $derived(`https://www.flickr.com/people/${user.nsid}/`);
+
+	onMount(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const res = await fetch(
+					`/api/contacts/state?nsid=${encodeURIComponent(user.nsid)}`
+				);
+				if (!res.ok) return;
+				const data = (await res.json()) as FollowState;
+				if (!cancelled) followState = data;
+			} catch {
+				/* fail silently — not worth blocking the page */
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	// Re-fetch when navigating between user pages (the same component instance
+	// stays mounted while activeTab changes, but the user prop swaps when you
+	// jump from /user/A/photostream to /user/B/photostream).
+	let lastNsid = untrack(() => user.nsid);
+	$effect(() => {
+		if (user.nsid === lastNsid) return;
+		lastNsid = user.nsid;
+		followState = null;
+		fetch(`/api/contacts/state?nsid=${encodeURIComponent(user.nsid)}`)
+			.then((r) => (r.ok ? r.json() : null))
+			.then((d: FollowState | null) => {
+				if (d && user.nsid === lastNsid) followState = d;
+			})
+			.catch(() => {});
+	});
 
 	interface Tab {
 		slug: string;
@@ -64,6 +112,29 @@
 			{#if user.location} · {user.location._content}{/if}
 		</p>
 	</div>
+	{#if followState && followState.signedIn && !followState.isSelf}
+		{#if followState.following}
+			<a
+				class="follow-badge following"
+				href={flickrPeopleUrl}
+				target="_blank"
+				rel="noopener"
+				title="You follow this person on Flickr — manage on flickr.com"
+			>
+				✓ Following
+			</a>
+		{:else}
+			<a
+				class="follow-badge follow"
+				href={flickrPeopleUrl}
+				target="_blank"
+				rel="noopener"
+				title="Open Flickr to add as a contact"
+			>
+				+ Follow on Flickr
+			</a>
+		{/if}
+	{/if}
 </header>
 
 <!-- Desktop: horizontal tab bar.  Hidden on ≤640px. -->
@@ -121,6 +192,34 @@
 		color: var(--fg-muted);
 		font-family: var(--font-mono);
 		font-size: 0.8rem;
+	}
+	.follow-badge {
+		margin-left: auto;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		padding: 0.4rem 0.85rem;
+		border-radius: 3px;
+		text-decoration: none;
+		white-space: nowrap;
+		transition: border-color 0.15s, color 0.15s;
+	}
+	.follow-badge.following {
+		color: #6cd58a;
+		border: 1px solid #2c5a3a;
+		background: rgba(108, 213, 138, 0.06);
+	}
+	.follow-badge.following:hover {
+		border-color: #6cd58a;
+		text-decoration: none;
+	}
+	.follow-badge.follow {
+		color: var(--accent);
+		border: 1px solid var(--border);
+		background: var(--bg-elev);
+	}
+	.follow-badge.follow:hover {
+		border-color: var(--accent);
+		text-decoration: none;
 	}
 	.user-nav {
 		display: flex;

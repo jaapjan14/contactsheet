@@ -1,32 +1,30 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
-	import { onNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 	import NotificationsBell from '$lib/components/NotificationsBell.svelte';
+	import PhotoOverlay from '$lib/components/PhotoOverlay.svelte';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	const isLoginPage = $derived($page.url.pathname === '/login');
+	// Darkroom-style modal: when a grid cell is clicked we pushState a
+	// /photo/[id] URL with the photo data in $page.state.photoOverlay
+	// rather than navigating. This keeps the grid mounted underneath, so
+	// closing is a pure history.back() and Safari's deep-grid scroll-restore
+	// gray-screen bug never has a chance to fire.
+	const photoOverlayState = $derived($page.state.photoOverlay);
 
-	onNavigate((navigation) => {
-		if (typeof document === 'undefined' || !('startViewTransition' in document)) return;
-		// Skip view transitions on browser back/forward (popstate). Back from
-		// the lightbox to a 100-thumbnail grid was triggering visible jitter
-		// because the browser has to snapshot every named element before the
-		// cross-fade. The user expects "back" to be instant; the morph effect
-		// only adds value going forward.
-		if (navigation.type === 'popstate') return;
-		return new Promise((resolve) => {
-			(document as Document & {
-				startViewTransition: (cb: () => Promise<void>) => unknown;
-			}).startViewTransition(async () => {
-				resolve();
-				await navigation.complete;
-			});
-		});
-	});
+	// View transitions disabled. They were morphing the clicked cell into the
+	// photo on forward nav, but the implementation interacted badly with deep
+	// infinite-scroll grids: every navigation snapshotted every cell with a
+	// `view-transition-name`, and a quick back-tap during the still-running
+	// forward animation left the browser's `::view-transition` overlay stuck
+	// on screen. Symptom was a "gray page" that needed a tap to dismiss, and
+	// the tap then landed on whatever cell was under the cursor — "delivered
+	// to a random place." Re-enable later only with per-click name-setting so
+	// only one cell is snapshotted per transition.
 </script>
 
 <svelte:head>
@@ -48,6 +46,12 @@
 		/>
 	</form>
 	<span class="spacer"></span>
+	<nav class="topnav" aria-label="Primary">
+		<a href="/explore" class="topnav-link" class:active={$page.url.pathname.startsWith('/explore')}>Explore</a>
+		{#if data.me}
+			<a href="/feed" class="topnav-link" class:active={$page.url.pathname.startsWith('/feed')}>Feed</a>
+		{/if}
+	</nav>
 	{#if data.me}
 		<NotificationsBell />
 	{/if}
@@ -75,7 +79,10 @@
 		<summary aria-label="Menu" title="Menu">⋯</summary>
 		<div class="menu-panel">
 			<a href="/">ContactSheet</a>
-			<a href="/explore">Explore</a>
+			<a href="/explore" class="menu-mobile-only">Explore</a>
+			{#if data.me}
+				<a href="/feed" class="menu-mobile-only">Feed</a>
+			{/if}
 			<hr />
 			{#if data.me}
 				<form method="POST" action="/auth/logout" class="menu-form">
@@ -93,6 +100,10 @@
 {/if}
 
 {@render children()}
+
+{#if photoOverlayState}
+	<PhotoOverlay data={photoOverlayState.data} />
+{/if}
 
 <style>
 	:global(:root) {
@@ -147,6 +158,26 @@
 	.spacer {
 		flex: 1 1 0;
 		min-width: 0;
+	}
+	.topnav {
+		display: flex;
+		gap: 1rem;
+		align-items: baseline;
+	}
+	.topnav-link {
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		color: var(--fg-muted);
+		padding: 0.2rem 0.1rem;
+		border-bottom: 2px solid transparent;
+	}
+	.topnav-link:hover {
+		color: var(--fg);
+		text-decoration: none;
+	}
+	.topnav-link.active {
+		color: var(--fg);
+		border-bottom-color: var(--accent);
 	}
 	.search {
 		margin: 0;

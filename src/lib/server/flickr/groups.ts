@@ -1,6 +1,6 @@
 import { flickr } from './client';
-import { flickrMaybeSigned } from './authenticated';
-import { wrap, key } from '$lib/server/cache';
+import { flickrAuth, flickrMaybeSigned } from './authenticated';
+import { wrap, key, del, delPrefix } from '$lib/server/cache';
 import type {
 	GroupsGetInfoResponse,
 	GroupsPoolGetPhotosResponse,
@@ -106,6 +106,53 @@ export async function getGroupInfo(groupId: string): Promise<FlickrGroupInfo> {
 		});
 		return res.group;
 	});
+}
+
+/**
+ * Join a group as the authed user. Flickr returns stat:'ok' on success;
+ * groups that require an invite or moderator approval respond with the
+ * "rules_pending" stat — caller should surface that as a friendlier message.
+ * Invalidates the user's group-list cache so the next /user/[id]/groups
+ * render reflects the change.
+ */
+export async function joinGroup(meNsid: string, groupId: string): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.join',
+		params: { group_id: groupId }
+	});
+	del(key('people.getGroups', { user_id: meNsid }));
+}
+
+/**
+ * Leave a group. `delete_photos=1` would also remove your photos from the
+ * pool — we leave that to the user via flickr.com because it's destructive
+ * and one-click. Default behaviour: leave the group, photos stay in pool.
+ */
+export async function leaveGroup(meNsid: string, groupId: string): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.leave',
+		params: { group_id: groupId }
+	});
+	del(key('people.getGroups', { user_id: meNsid }));
+}
+
+/**
+ * Add a photo to a group's pool. Caller must be authed and a member of the
+ * group (Flickr enforces). Returns whether the photo went straight into the
+ * pool or into a moderation queue (some groups require moderator approval —
+ * Flickr surfaces that as error code 7, which we fold into a successful
+ * response with `queued: true`).
+ */
+export async function addPhotoToGroup(
+	photoId: string,
+	groupId: string
+): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.pools.add',
+		params: { photo_id: photoId, group_id: groupId }
+	});
+	del(key('photos.getAllContexts', { photo_id: photoId }));
+	delPrefix(`groups.pools.getPhotos|group_id=${groupId}`);
 }
 
 /**

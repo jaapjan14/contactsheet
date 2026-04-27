@@ -1,6 +1,7 @@
 <script lang="ts">
 	import UserChrome from '$lib/components/UserChrome.svelte';
 	import { decodeFlickrEntities, sanitizeFlickrHtml } from '$lib/flickr/text';
+	import { onCellClick } from '$lib/photo-overlay';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -96,7 +97,12 @@
 			<h2>Most popular</h2>
 			<div class="popular-grid">
 				{#each data.popular.photo as p (p.id)}
-					<a class="popular-cell" href="/photo/{p.id}" title={p.title}>
+					<a
+					class="popular-cell"
+					href="/photo/{p.id}"
+					title={p.title}
+					onclick={(e) => onCellClick(e, p.id)}
+				>
 						<img
 							loading="lazy"
 							src="https://live.staticflickr.com/{p.server}/{p.id}_{p.secret}_q.jpg"

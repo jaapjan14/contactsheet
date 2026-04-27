@@ -11,7 +11,11 @@ import type {
 	FlickrComment
 } from './types';
 
-const TTL_INFO = 7 * 24 * 60 * 60; // 7 days
+// 1 hour. `getInfo` carries the live view count, which is why this can't be
+// cached for days — a popular photo's counter would freeze and read way low.
+// Title/description/tags also live here; they rarely change, but an hour-old
+// cache for those is fine.
+const TTL_INFO = 60 * 60;
 const TTL_SIZES = 7 * 24 * 60 * 60;
 const TTL_EXIF = 30 * 24 * 60 * 60; // 30 days — EXIF doesn't change once uploaded
 const TTL_COMMENTS = 60; // 1 minute — comments are mutable
@@ -19,7 +23,10 @@ const TTL_FAVES = 60; // 1 minute — fave count is mutable
 const TTL_CONTEXTS = 60 * 60; // 1 hour — album/group membership is fairly stable
 
 export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
-	return wrap(key('photos.getInfo', { photo_id: photoId }), TTL_INFO, async () => {
+	// Key suffix bumped when TTL_INFO dropped from 7d → 1h, so any entries
+	// written under the old long TTL are orphaned and get purged on schedule
+	// instead of serving stale view counts for up to a week.
+	return wrap(key('photos.getInfo.v2', { photo_id: photoId }), TTL_INFO, async () => {
 		const res = await flickrMaybeSigned<PhotosGetInfoResponse>({
 			method: 'flickr.photos.getInfo',
 			params: { photo_id: photoId }

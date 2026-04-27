@@ -2,6 +2,233 @@
 
 ## [Unreleased]
 
+### Added
+
+- **"Add to group" typeahead on the lightbox** — for owned photos, a new
+  disclosure under "In groups" lists Jacob's group memberships with a name
+  filter (type "leica" → all his Leica groups). Clicking a row calls a new
+  `POST /api/photo/[id]/groups` endpoint (`flickr.groups.pools.add`) and
+  optimistically appends the group to the live "In groups" list. The query
+  persists across clicks so a single "leica" filter can drive a batch add
+  across every Leica group; each row shows status inline — `+ add`,
+  `adding…`, `✓ added`, or `⏳ pending` (moderator approval, Flickr error
+  code 7). Already-in-pool errors (code 3) fold into success. Server load
+  fetches `flickr.people.getGroups` in parallel with the rest of the photo
+  data when the user is signed in (cached 5 min via the existing
+  `getUserGroups` helper). New `addPhotoToGroup` helper invalidates
+  `photos.getAllContexts` for the photo and the group's pool listing on
+  success.
+
+### Fixed
+
+- **Safari deep-grid back-nav gray-screen fixed via Darkroom-style modal
+  pattern.** Clicking a grid cell no longer routes to `/photo/[id]` — instead
+  `openPhoto()` (`src/lib/photo-overlay.ts`) calls `preloadData()` for the
+  same data the route would load server-side, then `pushState`s an entry
+  with `$page.state.photoOverlay = { data }`. The layout renders
+  `<PhotoOverlay>` (`src/lib/components/PhotoOverlay.svelte`) which wraps a
+  newly-extracted `<PhotoView>` component (`src/lib/components/PhotoView.svelte`,
+  ~1,500 lines moved verbatim from the old `+page.svelte`). Closing is just
+  `history.back()` — pops the pushState entry, the grid was never unmounted,
+  no scroll restoration runs. WebKit's deep-page back-nav snapshot bug
+  (gray screen, then click lands at the top of the page in some other
+  photo) is now structurally impossible: there's no navigation to mis-handle.
+  Direct visits to `/photo/[id]` (bookmarks, share links, hard reloads)
+  still render the standalone route page — the route file is now a thin
+  wrapper around `<PhotoView>`. Hooks added to PhotoView: `onclose` and
+  `onpaginate` props let the overlay swap data + URL in place when the
+  user clicks prev/next; route mode keeps the original `goto()` behavior.
+  Cell click handler `onCellClick(e, id)` preserves cmd/ctrl/middle/shift-
+  click for "open in new tab." Wired into 12 grid pages: explore, feed,
+  search, group, gallery, album, photostream, faves, camera-roll, stats,
+  about, notifications.
+- **View counts on `/photo/[id]` no longer go stale for up to a week.**
+  `flickr.photos.getInfo` was being cached for 7 days, but the `views` field
+  on the response is a live counter — a popular photo would freeze at the
+  first cached value (e.g. 254 views in-app vs 3,361 on Flickr). Dropped
+  `TTL_INFO` to 1 hour and bumped the cache key to `photos.getInfo.v2` so
+  any entries written under the old long TTL are orphaned and get purged on
+  schedule instead of serving stale counts.
+
+### Changed
+
+- **`/search` is now self-explanatory.** Added a page title and a short
+  blurb at the top making clear that this is the global Flickr search and
+  returns both photos and groups, plus a help line under the form
+  spelling out that `By user` and `Tags` only narrow the *photo* results
+  (groups always come from the text box). Field placeholders rewritten in
+  the same vein (`Text — title, description, tags…` / `By user (URL or
+  screen-name)` / `Tags only (comma-separated)`). The result-count meta
+  now also reports group matches alongside photo totals. Setup for the
+  next change: scoped in-page search inside `/group/[id]`, etc.
+
+### Added
+
+- **`/feed` — recent uploads from contacts.** New top-level page wired to
+  `flickr.photos.getContactsPhotos` (auth-only; max 50 most-recent
+  uploads from people you follow on Flickr — Flickr's endpoint doesn't
+  paginate). Hover overlay shows uploader name + relative upload time.
+  Anonymous viewers see a sign-in nudge instead. Linked from the header
+  ⋯ menu when signed in. Backed by a new `src/lib/server/flickr/contacts.ts`
+  module (`getMyContacts`, `getMyContactNsidSet`, `getContactsPhotos`,
+  cached 5 min and 1 min respectively).
+- **Follow indicator on `/user/[id]/...` pages.** UserChrome now lazy-loads
+  `/api/contacts/state?nsid=…` on mount; if the viewer follows the
+  displayed user, shows a green "✓ Following" badge that links out to
+  flickr.com to manage. Otherwise shows "+ Follow on Flickr" which opens
+  the user's flickr.com page in a new tab. Honest about the API
+  constraint: Flickr does not expose `contacts.add`, so a real in-app
+  follow button isn't possible — the bounce keeps Flickr's contact list
+  as the single source of truth, which `flickr.photos.getContactsPhotos`
+  reads back to populate `/feed`.
+- **Join / Leave button on `/group/[id]`.** Real in-app
+  `flickr.groups.join` / `flickr.groups.leave` calls — no flickr.com
+  bounce needed. Membership state lazy-loaded via a new
+  `/api/group/[id]/membership` endpoint (GET = read state, POST = join,
+  DELETE = leave). Optimistic flip on click with rollback on failure.
+  Cache invalidates `people.getGroups` for the authed user so the
+  `/user/[id]/groups` tab reflects the change on next load.
+
+### Fixed
+
+- **`close()` on the photo page now always prefers `history.back()`** when
+  there's any history to pop, regardless of whether `streamCtx` is in
+  sync. Earlier logic gated `history.back` on `streamCtx &&
+  history.length > 1`, so a stale or rejected `streamCtx` would silently
+  fall through to `goto(backHref)`, which is a fresh navigation and
+  scrolls to top. That explained the "bounces all the way to top of the
+  page" symptom on back-from-photo. `goto` is now only the fallback for
+  the literal direct-deep-link case (no history to pop).
+
+### Reverted
+
+- **`afterNavigate` scroll re-application backed out.** The
+  expand-then-scroll fix landed two iterations ago was making the
+  back-from-photo experience *worse*: users were getting teleported to
+  unrelated positions on every back. Trading a worse symptom (wrong
+  destination on every back) for a milder one (clamped near top of a
+  deeply-scrolled grid). All five grid pages reverted to the original
+  snapshot pattern that just re-initializes from `snapHolder` in the
+  script body.
+  Real fix is to adopt Darkroom Log's pattern: keep the grid mounted
+  and render the photo viewer as a modal overlay over it, so the grid
+  never unmounts and there's nothing to scroll-restore. See
+  `darkroom-log-reference.md`:390 — "All tabs preserve scroll position
+  while a photo detail is open — the grid stays mounted underneath."
+  Tracked separately.
+
+### Removed
+
+- **View transitions disabled.** The cell-to-photo morph was triggering
+  expensive snapshot work on every navigation (every grid cell carried a
+  unique `view-transition-name`), and a back-tap during the still-running
+  forward transition left the browser's `::view-transition` overlay
+  stuck on screen — visible as a dark page that needed a tap to
+  dismiss, with the tap then landing on whatever cell was at that
+  pixel coordinate. Symptom got dramatically worse once `/feed` and the
+  paginated `/search` started loading hundreds of cells via infinite
+  scroll. Removed `onNavigate(... startViewTransition)` from the layout
+  and stripped `view-transition-name` from grid cells (`/feed`,
+  `/search`, `/explore`, `/group/[id]`, `/user/[id]/photostream`) and
+  the photo page. The morph is gone but navigation is reliable.
+  Re-introducing the morph cleanly would require setting the name only
+  on the clicked cell at click time so the browser snapshots one
+  element instead of N.
+
+### Fixed
+
+- **Back-from-photo into a deeply-scrolled grid no longer lands near the
+  top.** Root cause was a snapshot/scroll-restore race that had been
+  latent across `/search`, `/explore`, `/group/[id]`,
+  `/user/[id]/photostream`, and the new `/feed`: SvelteKit's
+  `snapshot.restore()` runs *after* the new component mounts AND after
+  the built-in scroll restoration (verified against
+  `kit/runtime/client/client.js`:1879 vs :1917). So on back-nav, the
+  grid initialized with the small server-load page (~100 photos), the
+  browser tried to restore scroll to the deep saved Y, the page was too
+  short, and scroll clamped to a near-top position. The user landed on
+  a random near-top photo and saw a "gray page" of unpainted background
+  past the end of the short grid.
+  Fix: every snapshot now also captures `scrollY`. After every navigation
+  the page's `afterNavigate` callback expands local state to the buffered
+  depth and re-applies scroll on the next animation frame, so by the
+  time the browser has finished its work, the grid is tall enough and
+  scroll lands where the user left it. URL/key match is checked so back
+  to `/search?q=foo` from `/search?q=bar` doesn't smear state.
+  Also reverted yesterday's `content-visibility: auto` /
+  `contain-intrinsic-size: 220px 220px` change — it was making the
+  problem worse because the intrinsic size (220×220) was 12% smaller
+  than the actual cell size on a wide viewport, so the page reported
+  itself as shorter than reality and scroll restoration clamped even
+  with the full data loaded.
+- **Back-from-photo could land on the wrong page.** The photo route was
+  reading `streamCtx` from `sessionStorage` on mount and using whatever
+  was last stashed by any grid page in the tab. If you opened a photo
+  from `/feed`, then navigated to a user's photostream from inside that
+  photo, then hit back, then opened another photo and hit back again,
+  the leftover photostream context would silently steer "close" to that
+  photostream instead of `/feed`. Now we only honor a stashed
+  `streamCtx` whose `ids` actually contains the current photo — stale
+  contexts are ignored and back falls through to the photo owner's
+  photostream (which at least matches the photo on screen).
+
+### Performance
+
+- **`content-visibility: auto` on `.cell` across all grid pages**
+  (`/feed`, `/search`, `/group/[id]`, `/explore`, `/user/[id]/photostream`).
+  Lets the browser skip painting cells outside the viewport, with
+  `contain-intrinsic-size: 220px 220px` so layout still resolves
+  correctly. Targets the gray-screen flash when navigating back from a
+  photo into a deeply-scrolled grid.
+
+### Changed
+
+- **`/feed` swapped from `getContactsPhotos` to `photos.search&contacts=all`.**
+  The original `flickr.photos.getContactsPhotos` endpoint hard-caps at 50
+  photos with no pagination. Side-by-side comparison against the live
+  account showed the first ~4 photos identical, then the two endpoints
+  diverge (`getContactsPhotos` quietly diversifies away from prolific
+  uploaders, `photos.search` is pure chronological). Swapping unlocks
+  proper pagination — same infinite-scroll pattern as `/search` and
+  `/group/[id]`, dup-guard for Flickr's mostly-stable
+  `date-posted-desc` sort, scrollable up to Flickr's ~4,000-result cap.
+  Total available count appears in the blurb. The single uploader
+  binge-domination trade-off was deemed acceptable for the much larger
+  feed. `searchPhotos()` now accepts an optional `contacts: 'all' | 'ff'`
+  param. New `/api/feed?page=N` endpoint serves load-more pages. Dead
+  `getContactsPhotos()` removed from `src/lib/server/flickr/contacts.ts`.
+- **Header nav promoted on desktop.** `Explore` and `Feed` (signed-in
+  only) are now first-class header links between the brand and the
+  search box, with the active route underlined in accent. The ⋯ menu
+  was burying them and they were genuinely hard to find. On mobile
+  (≤640px) the topnav stays hidden and the same destinations live
+  inside ⋯ — keeps the single-row mobile header from getting crowded.
+- **`/search` blurb max-width bumped 60ch → 100ch** so it sits on two
+  lines on a desktop viewport instead of wrapping to four.
+
+### Added
+
+- **In-group search on `/group/[id]`.** New search box in the group
+  header — submits to `/group/[id]?q=…`, swaps the grid from
+  `groups.pools.getPhotos` to `flickr.photos.search` scoped via
+  `group_id`. Supports the same infinite-scroll loadMore behavior as the
+  full pool view; `?q=…` is forwarded to `/api/group/[id]/photos` so
+  paged fetches stay in search mode. A "show all" link clears back to
+  the full pool. `searchPhotos()` in `src/lib/server/flickr/search.ts`
+  now accepts an optional `groupId`. Establishes the
+  scoped-search-on-context-page pattern that will extend to album / user
+  pages next.
+- **BBCode share on the photo page.** New "Share / BBCode" disclosure in
+  the right column with a size selector (every photo-media size Flickr
+  offers, defaulting to the largest non-Original ≤ 1600 px), a generated
+  `[url=https://flic.kr/p/SHORT][img]LIVE_STATIC_URL[/img][/url]`, a
+  copy-to-clipboard button, and the short URL itself as a clickable link
+  beside it. Mirrors the affordance Flickr exposes on its own photo page.
+  Short URL uses Flickr's base58 alphabet (skips `0`, `O`, `l`, `I`); the
+  helper lives in `src/lib/flickr/urls.ts` as `flickrShortUrl()`.
+  `+page.server.ts` now also returns `photoSizes` (filtered to
+  `media === 'photo'`) for the picker.
+
 ### Docs
 
 - **README rewrite** — added a full Flickr API credentials walkthrough
