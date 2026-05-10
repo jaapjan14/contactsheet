@@ -165,11 +165,11 @@
 		const all = data.myGroups ?? [];
 		const q = groupQuery.trim().toLowerCase();
 		if (!q) {
-			// No query: show only addable so the unfiltered list isn't cluttered
-			// with already-in groups.
-			return all.filter((g) => statusOf(g) === 'addable').slice(0, 8);
+			// No query: show all addable groups, alphabetized. The scroll container
+			// handles the visual constraint so a tall list is fine.
+			return all.filter((g) => statusOf(g) === 'addable');
 		}
-		return all.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 20);
+		return all.filter((g) => g.name.toLowerCase().includes(q));
 	});
 	const addableMatchCount = $derived(
 		groupCandidates.filter((g) => statusOf(g) === 'addable').length

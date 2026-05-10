@@ -21,6 +21,23 @@
 
 ### Fixed
 
+- **Notifications no longer under-count fave activity.** `flickr.activity.userPhotos`
+  truncates the per-photo `event` array to a handful of entries — a photo that
+  picks up 98 faves in a day was surfacing as ~2 fave notifications. The poller
+  now treats activity as a "which photos have action" hint and, for any photo
+  with fave events in the response, calls `flickr.photos.getFavorites` to pull
+  the full faver list (capped at 100 per photo, scoped to a 30-day look-back).
+  Existing INSERT-OR-IGNORE dedup on `fave:<photoId>:<nsid>:<favedate>` keeps
+  the backfill idempotent. New `getPhotoFavorites()` helper in
+  `src/lib/server/flickr/photos.ts`. Group-approval ("admin approved your
+  photo for X") notifications are still missing — separate followup since
+  there's no first-class Flickr endpoint for that stream.
+- **"Add to group" list is no longer capped at 8 entries** — the unqueried
+  candidate list was sliced to 8, which made the dropdown feel "locked"
+  since the `.group-list` scroll container had nothing past the visible
+  rows to scroll to. Removed the cap (and the matching 20-item cap on the
+  search path); the existing `max-height: 16rem; overflow-y: auto` on the
+  list container handles the visual constraint.
 - **Safari deep-grid back-nav gray-screen fixed via Darkroom-style modal
   pattern.** Clicking a grid cell no longer routes to `/photo/[id]` — instead
   `openPhoto()` (`src/lib/photo-overlay.ts`) calls `preloadData()` for the

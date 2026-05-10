@@ -2,6 +2,7 @@ import { readAuth } from '$lib/server/auth/store';
 import { getUserPhotosActivity, type ActivityEvent } from '$lib/server/flickr/activity';
 import { getExplore } from '$lib/server/flickr/explore';
 import { getUserPhotos } from '$lib/server/flickr/people';
+import { getPhotoFavorites } from '$lib/server/flickr/photos';
 import { insertNotification } from '$lib/server/cache';
 
 // How often the background tick fires. Long enough to be polite to Flickr,
@@ -15,6 +16,17 @@ const RECENT_PHOTOS_TO_CHECK = 200;
 
 // Today's Explore is at most 500 photos; per_page=500 + page=1 gets all.
 const EXPLORE_FETCH_PER_PAGE = 500;
+
+// When a photo has recent fave activity, enumerate up to this many of its most
+// recent favers. `flickr.activity.userPhotos` truncates the per-photo events
+// array to only a handful, so a photo that gets 100 faves in a day shows up
+// here as ~3. Pulling the full list backfills the missing ones; INSERT OR
+// IGNORE on the sourceId means already-stored faves are no-ops.
+const FAVES_BACKFILL_PER_PHOTO = 100;
+// Only consider faves within this look-back when backfilling (matches the
+// activity timeframe, prevents us from re-importing year-old faves on photos
+// that just got new ones).
+const FAVES_BACKFILL_WINDOW_S = 30 * 24 * 60 * 60;
 
 // ---- Payload shapes (kept small so it's easy to render) ---------------
 
@@ -59,10 +71,24 @@ function asArray<T>(maybe: T | T[] | undefined): T[] {
 async function pollActivity(): Promise<{ inserted: number }> {
 	const items = await getUserPhotosActivity('30d', 50);
 	let inserted = 0;
+
+	// Track photos with any fave activity so we can enumerate their full faver
+	// list afterwards. The activity API truncates per-photo events.
+	const photosWithFaves = new Map<
+		string,
+		{ id: string; secret: string; server: string; title: string }
+	>();
+
 	for (const item of items) {
 		const events = asArray<ActivityEvent>(item.activity?.event as ActivityEvent | ActivityEvent[]);
 		for (const ev of events) {
 			if (ev.type === 'fave') {
+				photosWithFaves.set(item.id, {
+					id: item.id,
+					secret: item.secret,
+					server: item.server,
+					title: item.title?._content ?? ''
+				});
 				const sourceId = `fave:${item.id}:${ev.user}:${ev.dateadded}`;
 				const payload: FavoriteNotificationPayload = {
 					photoId: item.id,
@@ -92,6 +118,34 @@ async function pollActivity(): Promise<{ inserted: number }> {
 			}
 		}
 	}
+
+	// Backfill: for each photo with recent fave activity, fetch the full faver
+	// list and insert any we don't already have. Recovers what activity.userPhotos
+	// dropped — a photo with 98 faves in a day shows ~3 events from that endpoint
+	// but all 98 from photos.getFavorites.
+	const cutoff = Math.floor(Date.now() / 1000) - FAVES_BACKFILL_WINDOW_S;
+	for (const photo of photosWithFaves.values()) {
+		try {
+			const favers = await getPhotoFavorites(photo.id, FAVES_BACKFILL_PER_PHOTO);
+			for (const f of favers) {
+				if (!Number.isFinite(f.favedate) || f.favedate < cutoff) continue;
+				const sourceId = `fave:${photo.id}:${f.nsid}:${f.favedate}`;
+				const payload: FavoriteNotificationPayload = {
+					photoId: photo.id,
+					photoTitle: photo.title,
+					photoSecret: photo.secret,
+					photoServer: photo.server,
+					user: f.nsid,
+					username: f.username,
+					dateadded: f.favedate
+				};
+				if (insertNotification('favorite', sourceId, payload)) inserted++;
+			}
+		} catch (err) {
+			console.error(`[notifications] backfill faves failed for ${photo.id}:`, err);
+		}
+	}
+
 	return { inserted };
 }
 

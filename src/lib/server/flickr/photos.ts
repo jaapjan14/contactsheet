@@ -128,6 +128,31 @@ interface FavoritesCountResponse {
 	photo: { total: number | string; page: number; pages: number };
 }
 
+interface FavoritesListResponse {
+	stat: string;
+	photo: {
+		id: string;
+		secret: string;
+		server: string;
+		page: number | string;
+		pages: number | string;
+		perpage: number | string;
+		total: number | string;
+		person?: Array<{
+			nsid: string;
+			username: string;
+			favedate: string;
+			iconserver?: string;
+		}>;
+	};
+}
+
+export interface PhotoFaver {
+	nsid: string;
+	username: string;
+	favedate: number; // unix seconds
+}
+
 /**
  * Just the fave count for a photo — `flickr.photos.getInfo` doesn't include it,
  * so we hit `getFavorites` with per_page=1 and read `total`.
@@ -145,4 +170,27 @@ export async function getPhotoFavoritesCount(photoId: string): Promise<number> {
 			throw err;
 		}
 	});
+}
+
+/**
+ * Full list of users who faved a photo (most-recent favedate first, per Flickr's
+ * default ordering). Used by the notifications poller to recover faves that
+ * `flickr.activity.userPhotos` truncated. Not cached — caller dedups via
+ * INSERT OR IGNORE on `fave:photoId:nsid:favedate`.
+ */
+export async function getPhotoFavorites(photoId: string, perPage = 50): Promise<PhotoFaver[]> {
+	try {
+		const res = await flickrMaybeSigned<FavoritesListResponse>({
+			method: 'flickr.photos.getFavorites',
+			params: { photo_id: photoId, per_page: String(perPage) }
+		});
+		return (res.photo.person ?? []).map((p) => ({
+			nsid: p.nsid,
+			username: p.username,
+			favedate: Number(p.favedate)
+		}));
+	} catch (err) {
+		if (err instanceof FlickrError) return [];
+		throw err;
+	}
 }
