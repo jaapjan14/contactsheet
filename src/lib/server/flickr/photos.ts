@@ -16,7 +16,11 @@ import type {
 // Title/description/tags also live here; they rarely change, but an hour-old
 // cache for those is fine.
 const TTL_INFO = 60 * 60;
-const TTL_SIZES = 7 * 24 * 60 * 60;
+// Was 7d, but the URLs returned by `flickr.photos.getSizes` carry the photo's
+// `secret` — when the user replaces a photo on Flickr the secret rotates and
+// the old URL starts returning HTTP 410, leaving the page with a broken image
+// for up to a week. Match TTL_INFO so getInfo + getSizes refresh together.
+const TTL_SIZES = 60 * 60;
 const TTL_EXIF = 30 * 24 * 60 * 60; // 30 days — EXIF doesn't change once uploaded
 const TTL_COMMENTS = 60; // 1 minute — comments are mutable
 const TTL_FAVES = 60; // 1 minute — fave count is mutable
@@ -76,7 +80,10 @@ export async function getPhotoContexts(photoId: string): Promise<PhotoContexts> 
 }
 
 export async function getPhotoSizes(photoId: string): Promise<FlickrSizeEntry[]> {
-	return wrap(key('photos.getSizes', { photo_id: photoId }), TTL_SIZES, async () => {
+	// Key suffix bumped when TTL_SIZES dropped from 7d → 1h, so entries written
+	// under the old long TTL are orphaned and get re-fetched instead of serving
+	// URLs whose secret has since rotated (broken-image / HTTP 410).
+	return wrap(key('photos.getSizes.v2', { photo_id: photoId }), TTL_SIZES, async () => {
 		const res = await flickrMaybeSigned<PhotosGetSizesResponse>({
 			method: 'flickr.photos.getSizes',
 			params: { photo_id: photoId }

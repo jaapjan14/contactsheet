@@ -21,6 +21,13 @@
 
 ### Fixed
 
+- **Stale image URLs after a photo is replaced on Flickr.** `getPhotoSizes`
+  was cached for 7 days, but its URLs embed the photo's `secret`. When a user
+  replaces a photo on Flickr the secret rotates and the old URL returns
+  HTTP 410, leaving ContactSheet with a broken image for up to a week.
+  Lowered `TTL_SIZES` to 1h to match `TTL_INFO` so the two refresh together,
+  and bumped the cache key to `photos.getSizes.v2` to evict entries written
+  under the old TTL.
 - **Notifications no longer under-count fave activity.** `flickr.activity.userPhotos`
   truncates the per-photo `event` array to a handful of entries — a photo that
   picks up 98 faves in a day was surfacing as ~2 fave notifications. The poller
