@@ -156,6 +156,23 @@ export async function addPhotoToGroup(
 }
 
 /**
+ * Remove a photo from a group's pool. Caller must be authed; Flickr enforces
+ * that the caller is either the photo owner or the group admin. Invalidates
+ * the same caches as add so the UI re-reads fresh state on next render.
+ */
+export async function removePhotoFromGroup(
+	photoId: string,
+	groupId: string
+): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.pools.remove',
+		params: { photo_id: photoId, group_id: groupId }
+	});
+	del(key('photos.getAllContexts', { photo_id: photoId }));
+	delPrefix(`groups.pools.getPhotos|group_id=${groupId}`);
+}
+
+/**
  * Group pool: same maybe-signed deal. Private pools require the caller to
  * be a member; signed call lets Jacob read the pools of every group he
  * belongs to. Non-member private pools still 4xx — handle gracefully in the route.

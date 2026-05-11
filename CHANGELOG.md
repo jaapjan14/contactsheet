@@ -4,6 +4,16 @@
 
 ### Added
 
+- **"Remove from group" on the lightbox.** Each row of the "In groups" list now
+  shows a small `×` button for owned photos. Clicking it calls a new
+  `DELETE /api/photo/[id]/groups` endpoint (`flickr.groups.pools.remove`) and
+  removes the group from the live list on success. Mirrors the add flow:
+  not-in-pool errors (Flickr code 2) fold into success so the UI converges to
+  "removed" even if the state has drifted. New `removePhotoFromGroup` helper
+  invalidates the same caches as add (`photos.getAllContexts` for the photo
+  and the group's pool listing). Use case: undoing accidental adds without
+  having to round-trip through flickr.com.
+
 - **"Add to group" typeahead on the lightbox** — for owned photos, a new
   disclosure under "In groups" lists Jacob's group memberships with a name
   filter (type "leica" → all his Leica groups). Clicking a row calls a new

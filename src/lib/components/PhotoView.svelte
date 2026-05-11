@@ -153,6 +153,8 @@
 	let groupQuery = $state('');
 	let addingGroupId: string | null = $state(null);
 	let addGroupError: string | null = $state(null);
+	let removingGroupId: string | null = $state(null);
+	let removeGroupError: string | null = $state(null);
 
 	type GroupStatus = 'addable' | 'added' | 'pending';
 	function statusOf(g: FlickrUserGroup): GroupStatus {
@@ -221,6 +223,45 @@
 		}
 	}
 
+	async function removeFromGroup(group: { id: string; title: string }) {
+		if (removingGroupId) return;
+		removingGroupId = group.id;
+		removeGroupError = null;
+		try {
+			const res = await fetch(`/api/photo/${photo.id}/groups`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ groupId: group.id })
+			});
+			if (!res.ok) {
+				let msg = `HTTP ${res.status}`;
+				const ct = res.headers.get('content-type') ?? '';
+				if (ct.includes('application/json')) {
+					try {
+						const body = (await res.json()) as { message?: string; error?: string };
+						msg = body.message || body.error || msg;
+					} catch {
+						/* fall through */
+					}
+				} else if (res.status === 502 || res.status === 504) {
+					msg = 'Network hiccup — try again.';
+				}
+				throw new Error(msg);
+			}
+			liveGroups = liveGroups.filter((g) => g.id !== group.id);
+			// If we had it queued for moderation, clear that too — defensive.
+			if (pendingGroupIds.has(group.id)) {
+				const next = new Set(pendingGroupIds);
+				next.delete(group.id);
+				pendingGroupIds = next;
+			}
+		} catch (err) {
+			removeGroupError = (err as Error).message;
+		} finally {
+			removingGroupId = null;
+		}
+	}
+
 	let lastCommentPhotoId = $state(untrack(() => data.photo.id));
 	$effect(() => {
 		if (data.photo.id !== lastCommentPhotoId) {
@@ -235,6 +276,7 @@
 			pendingGroupIds = new Set();
 			groupQuery = '';
 			addGroupError = null;
+			removeGroupError = null;
 		}
 	});
 
@@ -982,13 +1024,28 @@
 				</summary>
 				<ul class="context-list">
 					{#each liveGroups as g (g.id)}
-						<li>
+						<li class="ctx-row">
 							<a href="/group/{g.id}">
 								{decodeFlickrEntities(g.title)}
 							</a>
+							{#if isOwner}
+								<button
+									type="button"
+									class="ctx-remove"
+									title={`Remove this photo from ${decodeFlickrEntities(g.title)}`}
+									aria-label={`Remove from ${decodeFlickrEntities(g.title)}`}
+									disabled={removingGroupId === g.id}
+									onclick={() => removeFromGroup(g)}
+								>
+									{removingGroupId === g.id ? '…' : '×'}
+								</button>
+							{/if}
 						</li>
 					{/each}
 				</ul>
+				{#if removeGroupError}
+					<p class="empty-comments">{removeGroupError}</p>
+				{/if}
 			</details>
 		{/if}
 
@@ -1668,6 +1725,12 @@
 	.context-list li {
 		font-size: 0.85rem;
 	}
+	.context-list .ctx-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
 	.context-list a {
 		color: #d8d8d8;
 		text-decoration: none;
@@ -1675,6 +1738,30 @@
 	}
 	.context-list a:hover {
 		border-bottom-color: var(--accent, #ffae00);
+	}
+	.ctx-remove {
+		appearance: none;
+		border: 0;
+		background: transparent;
+		color: var(--fg-muted, #888);
+		font-family: var(--font-mono);
+		font-size: 0.9rem;
+		line-height: 1;
+		padding: 0 0.35rem;
+		cursor: pointer;
+		opacity: 0.5;
+		transition: opacity 120ms ease, color 120ms ease;
+	}
+	.context-list .ctx-row:hover .ctx-remove,
+	.ctx-remove:focus-visible {
+		opacity: 1;
+	}
+	.ctx-remove:hover {
+		color: var(--accent, #ffae00);
+	}
+	.ctx-remove:disabled {
+		opacity: 0.4;
+		cursor: progress;
 	}
 	.ctx-count {
 		font-family: var(--font-mono);
