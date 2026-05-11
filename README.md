@@ -20,6 +20,17 @@ a community as easily as into a single image.
 
 ![Search with groups strip](screenshots/03-search-with-groups.png)
 
+## What's new in v1.1.0
+
+- **Manage group memberships from the lightbox** — for owned photos, the "In groups" disclosure now includes a typeahead that filters your Flickr group memberships and one-clicks the photo into any of them, plus an `×` per existing row to remove the photo from that group. Groups requiring rules acceptance (e.g. Rodinal Developer) get a small modal showing the rules with an "I agree" → join flow that mirrors flickr.com.
+- **Feed tab** — a personal "what's new from your contacts" stream.
+- **Photo overlay refactor** — clicking a thumbnail no longer page-navigates; the lightbox now opens as a `pushState` overlay over the grid, so closing is a pure `history.back()` with the grid still mounted and at scroll. Forward-nav from the lightbox (clicking a photographer/commenter) now correctly scrolls the destination page to top instead of inheriting the grid's saved scroll.
+- **Notifications: full fave backfill** — `flickr.activity.userPhotos` truncates per-photo events, so a photo that picked up 98 faves in a day previously surfaced as ~2 notifications. The poller now enumerates the full faver list (`flickr.photos.getFavorites`, capped at 100/photo, 30-day window) for any photo with fave activity.
+- **No more broken-image for up to a week after a Flickr photo replace** — `getPhotoSizes` was cached 7 d but its URLs embed the photo's `secret`, which rotates on replace. TTL dropped to 1 h; cache key bumped to evict.
+- **Better group/join error UX** — Cloudflare 502 HTML pages no longer dump into the membership-error pane; clean "Flickr took too long — try again" instead.
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
 ## Stack
 
 - SvelteKit 2 + Svelte 5 (TypeScript), Node adapter
