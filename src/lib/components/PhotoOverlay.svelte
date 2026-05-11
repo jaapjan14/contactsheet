@@ -59,16 +59,36 @@
 		body.style.right = '0';
 		body.style.width = '100%';
 		body.style.overflow = 'hidden';
+
+		// Distinguish "closing back to the grid" (popstate — close button,
+		// browser back, iOS swipe) from "forward navigation to a new page"
+		// (link click in the lightbox: photographer name, comment author,
+		// "in groups" chip). Only the former should restore the grid's
+		// saved scrollY — otherwise the new page is yanked down to wherever
+		// the previous grid was, landing the user in a "random area" with
+		// half-loaded cells they can't click.
+		let cameFromPopstate = false;
+		const onPop = () => {
+			cameFromPopstate = true;
+		};
+		window.addEventListener('popstate', onPop);
+
 		return () => {
+			window.removeEventListener('popstate', onPop);
 			body.style.position = prev.position;
 			body.style.top = prev.top;
 			body.style.left = prev.left;
 			body.style.right = prev.right;
 			body.style.width = prev.width;
 			body.style.overflow = prev.overflow;
-			// Restore the exact scroll position the grid had when the
-			// overlay opened — instant (no smooth) so close feels snappy.
-			window.scrollTo(0, scrollY);
+			if (cameFromPopstate) {
+				// Closing back to the underlying grid — restore the exact
+				// scroll position it had when the overlay opened.
+				window.scrollTo(0, scrollY);
+			}
+			// Forward nav: let SvelteKit's default scroll-to-top for the
+			// new route stand. (It's already run by the time we get here,
+			// 220ms after the out-fade started.)
 		};
 	});
 </script>

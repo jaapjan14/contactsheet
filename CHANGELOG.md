@@ -31,6 +31,17 @@
 
 ### Fixed
 
+- **Clicking a photographer/commenter link from the lightbox no longer drops
+  you in a random spot on their page.** The PhotoOverlay locks document
+  scroll on mount and, on unmount, unconditionally restored the underlying
+  grid's saved scrollY — so when the user forward-navigated to a different
+  user's photostream from the lightbox, the overlay's 220ms-later cleanup
+  yanked the new page down to the previous grid's scroll position (with
+  the predictable side-effect that cells below the half-loaded grid
+  couldn't be clicked). Restore now only runs on popstate-driven dismiss
+  (close button, browser back, iOS swipe). Forward navigation gets
+  SvelteKit's default scroll-to-top.
+
 - **Joining a rules-gated group (e.g. Rodinal Developer) no longer fails
   silently.** Flickr requires `accept_rules=1` for groups whose admin set
   rules; without it, `flickr.groups.join` returns error code 99 and on
