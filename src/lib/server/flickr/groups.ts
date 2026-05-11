@@ -109,16 +109,24 @@ export async function getGroupInfo(groupId: string): Promise<FlickrGroupInfo> {
 }
 
 /**
- * Join a group as the authed user. Flickr returns stat:'ok' on success;
- * groups that require an invite or moderator approval respond with the
- * "rules_pending" stat — caller should surface that as a friendlier message.
- * Invalidates the user's group-list cache so the next /user/[id]/groups
- * render reflects the change.
+ * Join a group as the authed user. Some groups have rules the user must
+ * accept (Flickr returns error code 99 / "User has not accepted rules for
+ * joining this group."). When `acceptRules` is true we pass
+ * `accept_rules=1` to record consent — the caller is responsible for
+ * having shown the user the rules text (available in groups.getInfo).
+ * Invalidates the user's group-list cache so the next render reflects the
+ * change.
  */
-export async function joinGroup(meNsid: string, groupId: string): Promise<void> {
+export async function joinGroup(
+	meNsid: string,
+	groupId: string,
+	opts: { acceptRules?: boolean } = {}
+): Promise<void> {
+	const params: Record<string, string> = { group_id: groupId };
+	if (opts.acceptRules) params.accept_rules = '1';
 	await flickrAuth({
 		method: 'flickr.groups.join',
-		params: { group_id: groupId }
+		params
 	});
 	del(key('people.getGroups', { user_id: meNsid }));
 }

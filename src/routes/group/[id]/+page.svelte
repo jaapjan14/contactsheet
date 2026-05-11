@@ -33,6 +33,11 @@
 	let membership = $state<MembershipState | null>(null);
 	let membershipPending = $state(false);
 	let membershipError: string | null = $state(null);
+	// Some groups require rules acceptance — Flickr returns error 99 unless
+	// `accept_rules=1` is passed. On first 409 from the server we open this
+	// modal showing the group's rules; "I agree" re-POSTs with the flag.
+	let rulesModalOpen = $state(false);
+	let agreeing = $state(false);
 
 	async function fetchMembership() {
 		try {
@@ -57,44 +62,75 @@
 		fetchMembership();
 	});
 
+	async function membershipErrorFrom(res: Response): Promise<string> {
+		let msg = `HTTP ${res.status}`;
+		const ct = res.headers.get('content-type') ?? '';
+		if (ct.includes('application/json')) {
+			try {
+				const body = (await res.json()) as { message?: string; error?: string };
+				msg = body.message || body.error || msg;
+			} catch {
+				/* fall through */
+			}
+		} else if (res.status === 502 || res.status === 504) {
+			msg = 'Flickr took too long — try again.';
+		}
+		return msg;
+	}
+
 	async function toggleMembership() {
 		if (!membership || membershipPending) return;
 		const wantJoin = !membership.member;
 		membershipPending = true;
 		membershipError = null;
-		// Optimistic flip so the button visibly responds; rollback on failure.
-		membership = { ...membership, member: wantJoin };
+		// Optimistic for leave only — for join, we wait on the server because
+		// a rules-gated group will need a separate "I agree" round-trip.
+		if (!wantJoin) membership = { ...membership, member: false };
 		try {
 			const res = await fetch(
 				`/api/group/${encodeURIComponent(data.groupKey)}/membership`,
 				{ method: wantJoin ? 'POST' : 'DELETE' }
 			);
-			if (!res.ok) {
-				// Cloudflare 502 / origin timeouts come back as HTML — don't dump
-				// that into the header. Pick a JSON `message` if present, otherwise
-				// a short generic for upstream errors.
-				let msg = `HTTP ${res.status}`;
-				const ct = res.headers.get('content-type') ?? '';
-				if (ct.includes('application/json')) {
-					try {
-						const body = (await res.json()) as { message?: string; error?: string };
-						msg = body.message || body.error || msg;
-					} catch {
-						/* fall through */
-					}
-				} else if (res.status === 502 || res.status === 504) {
-					msg = 'Flickr took too long — try again.';
-				}
-				throw new Error(msg);
+			if (wantJoin && res.status === 409) {
+				rulesModalOpen = true;
+				return;
 			}
+			if (!res.ok) throw new Error(await membershipErrorFrom(res));
 			const result = (await res.json()) as { member: boolean };
 			membership = { signedIn: true, member: result.member };
 		} catch (err) {
-			membership = { ...membership, member: !wantJoin };
+			if (!wantJoin) membership = { ...membership, member: true };
 			membershipError = (err as Error).message;
 		} finally {
 			membershipPending = false;
 		}
+	}
+
+	async function agreeAndJoin() {
+		if (agreeing || !membership) return;
+		agreeing = true;
+		membershipError = null;
+		try {
+			const res = await fetch(
+				`/api/group/${encodeURIComponent(data.groupKey)}/membership`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ acceptRules: true })
+				}
+			);
+			if (!res.ok) throw new Error(await membershipErrorFrom(res));
+			membership = { signedIn: true, member: true };
+			rulesModalOpen = false;
+		} catch (err) {
+			membershipError = (err as Error).message;
+		} finally {
+			agreeing = false;
+		}
+	}
+
+	function cancelJoin() {
+		rulesModalOpen = false;
 	}
 
 	const restored = untrack(() =>
@@ -290,6 +326,33 @@
 	{/if}
 {/if}
 
+{#if rulesModalOpen}
+	<div class="rules-backdrop" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+		<div class="rules-modal">
+			<h2 id="rules-title">Group rules</h2>
+			<p class="rules-intro">
+				If you agree to these rules, you can join <strong>{data.group.name._content}</strong>.
+			</p>
+			<div class="rules-body">
+				{#if data.group.rules?._content}
+					{@html data.group.rules._content}
+				{:else}
+					<p><em>This group did not publish rules text, but Flickr still requires you to acknowledge that rules exist before joining.</em></p>
+				{/if}
+			</div>
+			{#if membershipError}<p class="membership-error">{membershipError}</p>{/if}
+			<div class="rules-actions">
+				<button type="button" class="rules-cancel" onclick={cancelJoin} disabled={agreeing}>
+					No, thanks
+				</button>
+				<button type="button" class="rules-agree" onclick={agreeAndJoin} disabled={agreeing}>
+					{agreeing ? 'Joining…' : 'I agree'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style>
 	.topnav {
 		max-width: 80rem;
@@ -481,5 +544,87 @@
 	}
 	.empty {
 		font-size: 0.9rem;
+	}
+	.rules-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.7);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		padding: 1.5rem;
+	}
+	.rules-modal {
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		max-width: 32rem;
+		width: 100%;
+		max-height: 80vh;
+		display: flex;
+		flex-direction: column;
+		padding: 1.5rem;
+		gap: 0.85rem;
+		font-family: var(--font-sans);
+	}
+	.rules-modal h2 {
+		margin: 0;
+		font-size: 1.1rem;
+		font-weight: 600;
+	}
+	.rules-intro {
+		margin: 0;
+		font-size: 0.88rem;
+		color: var(--fg-muted);
+	}
+	.rules-body {
+		overflow-y: auto;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		padding: 0.85rem 1rem;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		flex: 1;
+	}
+	.rules-body :global(a) {
+		color: var(--accent);
+	}
+	.rules-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.6rem;
+	}
+	.rules-cancel,
+	.rules-agree {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		padding: 0.5rem 1rem;
+		border-radius: 3px;
+		cursor: pointer;
+		border: 1px solid var(--border);
+	}
+	.rules-cancel {
+		background: var(--bg-elev);
+		color: var(--fg-muted);
+	}
+	.rules-cancel:hover:not(:disabled) {
+		color: var(--fg);
+		border-color: var(--fg-muted);
+	}
+	.rules-agree {
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
+		font-weight: 500;
+	}
+	.rules-agree:hover:not(:disabled) {
+		filter: brightness(1.1);
+	}
+	.rules-agree:disabled,
+	.rules-cancel:disabled {
+		opacity: 0.6;
+		cursor: progress;
 	}
 </style>

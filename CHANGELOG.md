@@ -31,6 +31,17 @@
 
 ### Fixed
 
+- **Joining a rules-gated group (e.g. Rodinal Developer) no longer fails
+  silently.** Flickr requires `accept_rules=1` for groups whose admin set
+  rules; without it, `flickr.groups.join` returns error code 99 and on
+  contactsheet that surfaced as a Cloudflare 502 (because the call kept
+  retrying / timed out at the tunnel). Now the server detects code 99 and
+  returns `409 {error:'rules_required'}`; the client opens a small modal
+  with the group's rules text (already available from `groups.getInfo`)
+  and on "I agree" re-POSTs with `acceptRules:true`. `joinGroup` accepts
+  an `{acceptRules}` option and passes the flag through. Mirrors the
+  flickr.com Web UI flow.
+
 - **Group join/leave no longer dumps a Cloudflare 502 HTML page into the
   header on upstream timeouts.** When the join/leave round-trip exceeds the
   Cloudflare tunnel limit (e.g. a slow Flickr response), the response body

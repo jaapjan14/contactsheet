@@ -33,13 +33,32 @@ async function resolveOrThrow(idParam: string): Promise<string> {
 	}
 }
 
-export const POST: RequestHandler = async ({ params }) => {
+export const POST: RequestHandler = async ({ params, request }) => {
 	const meNsid = await requireAuthedNsid();
 	const groupId = await resolveOrThrow(params.id);
+
+	let acceptRules = false;
+	// Body is optional — old clients post without one.
 	try {
-		await joinGroup(meNsid, groupId);
+		const body = (await request.json()) as { acceptRules?: boolean };
+		acceptRules = body?.acceptRules === true;
+	} catch {
+		/* no body, that's fine */
+	}
+
+	try {
+		await joinGroup(meNsid, groupId, { acceptRules });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		if (err instanceof FlickrError) {
+			// Code 99 = "User has not accepted rules for joining this group."
+			// Surface as 409 so the client can show the rules modal and retry
+			// with acceptRules:true. Distinct status from a generic upstream
+			// error so the client doesn't have to string-match.
+			if (err.code === 99 && !acceptRules) {
+				return json({ error: 'rules_required' }, { status: 409 });
+			}
+			throw error(502, err.message);
+		}
 		throw err;
 	}
 	return json({ member: true });
