@@ -70,8 +70,22 @@
 				{ method: wantJoin ? 'POST' : 'DELETE' }
 			);
 			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
+				// Cloudflare 502 / origin timeouts come back as HTML — don't dump
+				// that into the header. Pick a JSON `message` if present, otherwise
+				// a short generic for upstream errors.
+				let msg = `HTTP ${res.status}`;
+				const ct = res.headers.get('content-type') ?? '';
+				if (ct.includes('application/json')) {
+					try {
+						const body = (await res.json()) as { message?: string; error?: string };
+						msg = body.message || body.error || msg;
+					} catch {
+						/* fall through */
+					}
+				} else if (res.status === 502 || res.status === 504) {
+					msg = 'Flickr took too long — try again.';
+				}
+				throw new Error(msg);
 			}
 			const result = (await res.json()) as { member: boolean };
 			membership = { signedIn: true, member: result.member };

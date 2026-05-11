@@ -31,6 +31,14 @@
 
 ### Fixed
 
+- **Group join/leave no longer dumps a Cloudflare 502 HTML page into the
+  header on upstream timeouts.** When the join/leave round-trip exceeds the
+  Cloudflare tunnel limit (e.g. a slow Flickr response), the response body
+  is HTML — the old code stringified it directly into `membershipError`
+  and rendered a screenful of markup. Now the client inspects the
+  `content-type`, extracts the `message` field from JSON errors, and falls
+  back to "Flickr took too long — try again." for 502/504 HTML.
+
 - **Stale image URLs after a photo is replaced on Flickr.** `getPhotoSizes`
   was cached for 7 days, but its URLs embed the photo's `secret`. When a user
   replaces a photo on Flickr the secret rotates and the old URL returns
