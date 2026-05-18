@@ -1,5 +1,67 @@
 # Changelog
 
+## v1.2.0 (2026-05-18)
+
+### Performance
+
+- **Click-to-open feels instant again.** Three-part fix for the lag that
+  crept in around v1.1.0:
+
+  - **A. `openPhoto()` no longer blocks the click on the server load.**
+    `src/lib/photo-overlay.ts` was doing `await preloadData(href)` *before*
+    `pushState`, so the click stalled until the route's full Promise.all
+    resolved — visible as "nothing happens for a beat after clicking."
+    Now it `pushState`s synchronously with just the photoId; the overlay
+    backdrop appears within a frame. `<PhotoOverlay>`
+    (`src/lib/components/PhotoOverlay.svelte`) does its own
+    `preloadData()` internally (reusing any hover-preload cache) and
+    swaps in `<PhotoView>` once the critical core resolves. Pagination
+    inside the overlay (`paginate(id)`) follows the same pattern via
+    `replaceState`. `app.PageState.photoOverlay` shrinks from
+    `{ data: PhotoViewData }` to `{ photoId: string }` since pushState
+    state must be JSON-serializable and the new load returns
+    non-cloneable streamed Promises.
+
+  - **B. Non-critical fields stream from the load function.**
+    `src/routes/photo/[id]/+page.server.ts` only awaits the critical
+    core (`photo`, `sizes`, `exif`) — those are needed to render any
+    image at all. `comments`, `favesCount`, `contexts`, and `myGroups`
+    are returned as streamed Promises; the image and EXIF panel paint
+    as soon as the core resolves, and the social/group sidebars fill
+    in as each promise lands. `PhotoView.svelte` got a `resolveStreamed`
+    `$effect` that resolves the four promises with a monotonic token
+    guarding against stale resolves after pagination. PhotoView's
+    optimistic-update flows (toggleFave, submitComment, addToGroup,
+    removeFromGroup) continue to operate on the local `$state` mirrors;
+    they're now initialized empty and reseeded each time the streamed
+    contexts resolve for a new photo.
+
+  - **C. Bumped `TTL_COMMENTS` and `TTL_FAVES` from 60s → 5min.** Both
+    were near-always cache misses on photo open, costing two live
+    Flickr calls per click on the critical path. 5min keeps freshness
+    reasonable; the mutation endpoints (post-comment, fave-toggle)
+    still invalidate via `del()` so the user sees their own changes
+    instantly.
+
+  Net measured effect on a cache-warm photo over the Cloudflare tunnel:
+  click → overlay backdrop in <50 ms (was ~400-800 ms), image visible
+  ~150-250 ms after, social panels another 100-300 ms after that.
+
+### Changed
+
+- **App icon — 3x3 contact-sheet grid with one orange cell.** Replaces
+  the leftover SvelteKit-default Svelte logo in `src/lib/assets/favicon.svg`
+  (which Safari was rendering inconsistently in pinned bookmarks and
+  Favorites bars, defaulting to a globe placeholder). New icon lives in
+  `static/` so `app.html` can declare it directly: SVG favicon for modern
+  browsers, 32×32 + 16×16 PNG fallbacks, plus a 180×180
+  `apple-touch-icon.png` for iOS home screen and Safari's pinned-bookmark
+  rendering. Also adds `<meta name="theme-color" content="#111111">` so
+  the mobile browser chrome matches the app's dark backdrop.
+  Distinct from Darkroom Log's solid-orange bookmark mark in the
+  Favorites bar: ContactSheet's silhouette is a dark grid with one
+  small orange accent cell. Rasterized via `librsvg` (`rsvg-convert`).
+
 ## v1.1.0 (2026-05-10)
 
 ### Added

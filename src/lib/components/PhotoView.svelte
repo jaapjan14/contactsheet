@@ -10,7 +10,7 @@
 		FlickrComment,
 		PhotosGetExifResponse
 	} from '$lib/server/flickr/types';
-	import type { PhotoContexts } from '$lib/server/flickr/photos';
+	import type { PhotoContexts, PhotoContextPool } from '$lib/server/flickr/photos';
 	import type { FlickrUserGroup } from '$lib/server/flickr/groups';
 
 	export interface PhotoViewData {
@@ -20,10 +20,13 @@
 		maxRes: FlickrSizeEntry | null;
 		photoSizes: FlickrSizeEntry[];
 		exif: PhotosGetExifResponse['photo'] | null;
-		comments: FlickrComment[];
-		favesCount: number;
-		contexts: PhotoContexts;
-		myGroups?: FlickrUserGroup[];
+		// Streamed from +page.server.ts so the click-to-open feels instant.
+		// PhotoView resolves these in an $effect and fills in the
+		// fave/comments/contexts/my-groups panels as each arrives.
+		comments: Promise<FlickrComment[]> | FlickrComment[];
+		favesCount: Promise<number> | number;
+		contexts: Promise<PhotoContexts> | PhotoContexts;
+		myGroups?: Promise<FlickrUserGroup[]> | FlickrUserGroup[];
 		me?: { nsid: string; username: string; fullname?: string | null } | null;
 	}
 
@@ -105,11 +108,16 @@
 	// errors into success so the first click flips the visible state correctly.
 	let faved = $state(false);
 	let faving = $state(false);
-	let faveCount = $state(untrack(() => data.favesCount));
+	// faveCount, liveComments, resolvedContexts, resolvedMyGroups start empty
+	// and get populated by resolveStreamed() below as the streamed promises
+	// resolve. Optimistic mutations (toggleFave, submitComment, addToGroup)
+	// update these locally; the server-side cache invalidations on those
+	// endpoints ensure the next fresh load reflects the change.
+	let faveCount = $state(0);
+	let liveComments = $state<FlickrComment[]>([]);
+	let resolvedContexts = $state<PhotoContexts>({ albums: [], groups: [] });
+	let resolvedMyGroups = $state<FlickrUserGroup[]>([]);
 
-	// Comment compose + live comment list (initialized from server data,
-	// updated optimistically on submit so the user sees their comment immediately).
-	let liveComments = $state(untrack(() => data.comments));
 	let commentDraft = $state('');
 	let posting = $state(false);
 	let commentError: string | null = $state(null);
@@ -143,12 +151,15 @@
 		}
 	}
 
-	// Add-to-group typeahead. Filters Jacob's own group memberships (loaded
-	// server-side as `data.myGroups`) by name. Already-in and pending-moderation
-	// groups stay in the list with a status icon so a "leica"-style search
-	// keeps showing all matches as he batch-adds across them — the query
-	// persists across clicks for that reason.
-	let liveGroups = $state(untrack(() => data.contexts?.groups ?? []));
+	// Add-to-group typeahead. Filters Jacob's own group memberships (streamed
+	// from the server as `data.myGroups`, resolved in resolveStreamed below)
+	// by name. Already-in and pending-moderation groups stay in the list with
+	// a status icon so a "leica"-style search keeps showing all matches as he
+	// batch-adds across them — the query persists across clicks for that
+	// reason. `liveGroups` mirrors resolvedContexts.groups but is mutated
+	// optimistically by addToGroup / removeFromGroup; it gets reseeded each
+	// time the streamed contexts resolve for a new photo.
+	let liveGroups = $state<PhotoContextPool[]>([]);
 	let pendingGroupIds = $state(new Set<string>());
 	let groupQuery = $state('');
 	let addingGroupId: string | null = $state(null);
@@ -164,7 +175,7 @@
 	}
 
 	const groupCandidates = $derived.by(() => {
-		const all = data.myGroups ?? [];
+		const all = resolvedMyGroups;
 		const q = groupQuery.trim().toLowerCase();
 		if (!q) {
 			// No query: show all addable groups, alphabetized. The scroll container
@@ -262,22 +273,59 @@
 		}
 	}
 
+	// Photo-change reset. Fires when paginating to a different photo within the
+	// overlay (or hitting the standalone route directly for a new photo). Clears
+	// UI state and the streamed-data caches; resolveStreamed below repopulates
+	// from the new photo's deferred promises as they arrive.
 	let lastCommentPhotoId = $state(untrack(() => data.photo.id));
 	$effect(() => {
 		if (data.photo.id !== lastCommentPhotoId) {
 			lastCommentPhotoId = data.photo.id;
-			liveComments = data.comments;
 			commentDraft = '';
 			faved = false;
-			faveCount = data.favesCount;
 			shareSizeSource = defaultShareSizeSource;
 			copied = false;
-			liveGroups = data.contexts?.groups ?? [];
 			pendingGroupIds = new Set();
 			groupQuery = '';
 			addGroupError = null;
 			removeGroupError = null;
+			// Clear streamed state until the new photo's promises resolve. Without
+			// this the old photo's comments/faves/contexts would flash on screen
+			// for a beat after pagination.
+			liveComments = [];
+			faveCount = 0;
+			resolvedContexts = { albums: [], groups: [] };
+			liveGroups = [];
+			resolvedMyGroups = [];
 		}
+	});
+
+	// Resolve the streamed promises (comments, favesCount, contexts, myGroups).
+	// Runs on mount and re-runs each time data.comments etc. change reference
+	// (i.e., a new photo loaded). A monotonic token guards against a stale
+	// resolve landing after the user has paginated to a different photo.
+	let resolveToken = 0;
+	$effect(() => {
+		const token = ++resolveToken;
+		const expectedId = data.photo.id;
+		Promise.all([
+			Promise.resolve(data.comments).catch((): FlickrComment[] => []),
+			Promise.resolve(data.favesCount).catch(() => 0),
+			Promise.resolve(data.contexts).catch(
+				(): PhotoContexts => ({ albums: [], groups: [] })
+			),
+			Promise.resolve(data.myGroups ?? ([] as FlickrUserGroup[])).catch(
+				(): FlickrUserGroup[] => []
+			)
+		]).then(([c, fc, ctx, mg]) => {
+			if (token !== resolveToken) return;
+			if (expectedId !== data.photo.id) return;
+			liveComments = c;
+			faveCount = fc;
+			resolvedContexts = ctx;
+			liveGroups = ctx.groups;
+			resolvedMyGroups = mg;
+		});
 	});
 
 	async function toggleFave() {
@@ -995,14 +1043,14 @@
 			</details>
 		{/if}
 
-		{#if data.contexts && data.contexts.albums.length > 0}
+		{#if resolvedContexts.albums.length > 0}
 			<details class="discl">
 				<summary>
 					In albums
-					<span class="discl-count">{data.contexts.albums.length}</span>
+					<span class="discl-count">{resolvedContexts.albums.length}</span>
 				</summary>
 				<ul class="context-list">
-					{#each data.contexts.albums as a (a.id)}
+					{#each resolvedContexts.albums as a (a.id)}
 						<li>
 							<a href="/album/{a.id}">
 								{decodeFlickrEntities(a.title)}
@@ -1049,7 +1097,7 @@
 			</details>
 		{/if}
 
-		{#if isOwner && data.myGroups && data.myGroups.length > 0}
+		{#if isOwner && resolvedMyGroups.length > 0}
 			<details class="discl">
 				<summary>
 					Add to group

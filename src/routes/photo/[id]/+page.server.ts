@@ -6,11 +6,12 @@ import {
 	getPhotoExif,
 	getPhotoComments,
 	getPhotoFavoritesCount,
-	getPhotoContexts
+	getPhotoContexts,
+	type PhotoContexts
 } from '$lib/server/flickr/photos';
 import { getUserGroups, type FlickrUserGroup } from '$lib/server/flickr/groups';
 import { readAuth } from '$lib/server/auth/store';
-import type { FlickrSizeEntry } from '$lib/server/flickr/types';
+import type { FlickrSizeEntry, FlickrComment } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
 const TARGET_DISPLAY_WIDTH = 2048;
@@ -65,25 +66,36 @@ function pickMaxResSize(
 
 export const load: PageServerLoad = async ({ params }) => {
 	try {
+		// Critical core — must resolve before anything paints. Without these the
+		// page can't render an image. Everything else is non-critical and gets
+		// streamed (returned as Promises) so the click-to-open feels instant and
+		// the social/group panels fill in progressively.
 		const auth = await readAuth();
-		const [photo, sizes, exif, comments, favesCount, contexts, myGroups] = await Promise.all([
+		const [photo, sizes, exif] = await Promise.all([
 			getPhotoInfo(params.id),
 			getPhotoSizes(params.id),
-			getPhotoExif(params.id),
-			getPhotoComments(params.id),
-			getPhotoFavoritesCount(params.id),
-			getPhotoContexts(params.id),
-			auth ? getUserGroups(auth.nsid).catch((): FlickrUserGroup[] => []) : Promise.resolve([] as FlickrUserGroup[])
+			getPhotoExif(params.id)
 		]);
 
 		const display = pickDisplaySize(sizes);
 		if (!display) throw error(404, 'No displayable sizes for this photo');
 		const highRes = pickHighResSize(sizes, display);
 		const maxRes = pickMaxResSize(sizes, highRes);
-
-		// Photo-media sizes only — used by the BBCode share picker. Drop video
-		// renditions (they have media === 'video') so the menu is clean.
 		const photoSizes = sizes.filter((s) => s.media === 'photo');
+
+		// Streamed — these come back as Promises in `data`. PhotoView resolves
+		// them in an $effect and fills in fave count, comments, contexts, and
+		// the add-to-group list as each arrives.
+		const commentsPromise: Promise<FlickrComment[]> = getPhotoComments(params.id).catch(
+			(): FlickrComment[] => []
+		);
+		const favesCountPromise: Promise<number> = getPhotoFavoritesCount(params.id).catch(() => 0);
+		const contextsPromise: Promise<PhotoContexts> = getPhotoContexts(params.id).catch(
+			(): PhotoContexts => ({ albums: [], groups: [] })
+		);
+		const myGroupsPromise: Promise<FlickrUserGroup[]> = auth
+			? getUserGroups(auth.nsid).catch((): FlickrUserGroup[] => [])
+			: Promise.resolve([] as FlickrUserGroup[]);
 
 		return {
 			photo,
@@ -92,10 +104,10 @@ export const load: PageServerLoad = async ({ params }) => {
 			maxRes,
 			photoSizes,
 			exif,
-			comments,
-			favesCount,
-			contexts,
-			myGroups
+			comments: commentsPromise,
+			favesCount: favesCountPromise,
+			contexts: contextsPromise,
+			myGroups: myGroupsPromise
 		};
 	} catch (err) {
 		if (err instanceof FlickrError) {

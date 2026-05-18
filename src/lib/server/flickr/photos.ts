@@ -22,8 +22,14 @@ const TTL_INFO = 60 * 60;
 // for up to a week. Match TTL_INFO so getInfo + getSizes refresh together.
 const TTL_SIZES = 60 * 60;
 const TTL_EXIF = 30 * 24 * 60 * 60; // 30 days — EXIF doesn't change once uploaded
-const TTL_COMMENTS = 60; // 1 minute — comments are mutable
-const TTL_FAVES = 60; // 1 minute — fave count is mutable
+// 5 minutes. Was 60s, but every photo open beyond 60s was paying for two live
+// Flickr calls (comments + favesCount) on the critical path, which directly
+// translated into click-to-open lag — measurably worse over the Cloudflare
+// tunnel. 5min keeps fave/comment freshness reasonable while removing the
+// "every click is a cache miss" cost. Mutations (post-comment, fave-toggle)
+// still invalidate via `del()` so the user sees their own changes instantly.
+const TTL_COMMENTS = 5 * 60;
+const TTL_FAVES = 5 * 60;
 const TTL_CONTEXTS = 60 * 60; // 1 hour — album/group membership is fairly stable
 
 export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {

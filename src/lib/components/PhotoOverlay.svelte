@@ -6,10 +6,18 @@
 
 	// Darkroom-style modal: the grid below stays mounted, this overlay is
 	// driven entirely by $page.state.photoOverlay (set via pushState in
-	// openPhoto). Closing pops the pushState, which removes that state and
-	// unmounts this component automatically — no real navigation, no Safari
-	// scroll-restore, no gray screen on deep grids.
-	let { data }: { data: PhotoViewData } = $props();
+	// openPhoto). State carries only the photoId — pushState state must be
+	// JSON-serializable, and the load returns streamed Promises that aren't
+	// cloneable. The overlay does its own preloadData() per photoId, which
+	// reuses SvelteKit's hover-preload cache when available.
+	//
+	// Closing pops the pushState, which removes that state and unmounts this
+	// component automatically — no real navigation, no Safari scroll-restore,
+	// no gray screen on deep grids.
+	let { photoId }: { photoId: string } = $props();
+
+	let data: PhotoViewData | null = $state(null);
+	let loadError: string | null = $state(null);
 
 	function close() {
 		// Pops the pushState entry openPhoto added → $page.state.photoOverlay
@@ -18,22 +26,41 @@
 		if (typeof window !== 'undefined') window.history.back();
 	}
 
-	async function paginate(id: string) {
-		// Preload the same data the standalone /photo/[id] route would have
-		// loaded server-side, then replaceState so the URL + overlay state
-		// flip in place without a history entry. Pages-through stay one
-		// history step from the grid no matter how many photos the user
-		// flips through.
-		const result = await preloadData(`/photo/${id}`);
-		if (result.type === 'loaded' && result.status === 200) {
-			replaceState(`/photo/${id}`, {
-				photoOverlay: { data: result.data as PhotoViewData }
+	// Load (or reload) data when photoId changes. The previous render keeps
+	// showing the old image while the new one resolves — that's the right call
+	// because the click feedback (URL change + active state) has already fired
+	// and the user expects the page to update, not blank out. A token guards
+	// against an older preload arriving after a faster newer one.
+	let loadToken = 0;
+	$effect(() => {
+		const id = photoId;
+		const token = ++loadToken;
+		loadError = null;
+		preloadData(`/photo/${id}`)
+			.then((result) => {
+				if (token !== loadToken) return;
+				if (result.type === 'loaded' && result.status === 200) {
+					data = result.data as PhotoViewData;
+				} else if (result.type === 'redirect') {
+					window.location.href = result.location;
+				} else {
+					// Load failed — fall through to a real navigation so the user
+					// still gets the photo (or a real 404 page), just without the
+					// overlay nicety.
+					window.location.href = `/photo/${id}`;
+				}
+			})
+			.catch(() => {
+				if (token !== loadToken) return;
+				loadError = 'Failed to load photo.';
 			});
-		} else {
-			// Preload failed — fall back to a real navigation so the user
-			// still gets the photo, just without the overlay nicety.
-			window.location.href = `/photo/${id}`;
-		}
+	});
+
+	function paginate(id: string) {
+		// replaceState with the new photoId — the $effect above sees the prop
+		// change and reloads. Stays one history step from the grid no matter how
+		// many photos the user pages through.
+		replaceState(`/photo/${id}`, { photoOverlay: { photoId: id } });
 	}
 
 	// Lock the document scroll while the overlay is mounted. iOS Safari
@@ -82,32 +109,38 @@
 			body.style.width = prev.width;
 			body.style.overflow = prev.overflow;
 			if (cameFromPopstate) {
-				// Closing back to the underlying grid — restore the exact
-				// scroll position it had when the overlay opened.
 				window.scrollTo(0, scrollY);
 			}
-			// Forward nav: let SvelteKit's default scroll-to-top for the
-			// new route stand. (It's already run by the time we get here,
-			// 220ms after the out-fade started.)
 		};
 	});
 </script>
 
 <!-- `out:fade` only — open is instant; close fades over 220ms. The fade
      window absorbs leftover swipe inertia visually so dismiss doesn't snap.
-     Mirrors Darkroom Log's `recent-detail-view.dismissing` pattern (its
-     overlay also has a `transition: opacity 0.22s ease`). The body-scroll
-     lock $effect's cleanup runs when this component is unmounted (which
-     is after the out-transition completes), so the grid stays locked for
-     the full fade and is only revealed when the overlay is fully gone. -->
+     Mirrors Darkroom Log's `recent-detail-view.dismissing` pattern. The
+     body-scroll lock $effect's cleanup runs when this component is unmounted
+     (after the out-transition completes), so the grid stays locked for the
+     full fade and is only revealed when the overlay is fully gone. -->
 <div
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label={data.photo.title._content || 'Photo'}
+	aria-label={data?.photo.title._content || 'Photo'}
 	out:fade={{ duration: 220 }}
 >
-	<PhotoView {data} onclose={close} onpaginate={paginate} />
+	{#if data}
+		<PhotoView {data} onclose={close} onpaginate={paginate} />
+	{:else if loadError}
+		<div class="overlay-state">
+			<p>{loadError}</p>
+			<button type="button" class="overlay-btn" onclick={close}>← back</button>
+		</div>
+	{:else}
+		<!-- Pending state: blank backdrop. Showing the overlay backdrop is the
+		     visual ack that the click registered; a spinner would just add noise
+		     for a typical sub-300ms wait. -->
+		<div class="overlay-state" aria-busy="true" aria-label="Loading photo"></div>
+	{/if}
 </div>
 
 <style>
@@ -122,5 +155,27 @@
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		-webkit-overflow-scrolling: touch;
+	}
+	.overlay-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 100dvh;
+		color: #888;
+		font-family: 'IBM Plex Sans', system-ui, sans-serif;
+		gap: 1rem;
+	}
+	.overlay-btn {
+		background: transparent;
+		border: 1px solid #2a2a2a;
+		color: #e8e8e8;
+		padding: 0.5rem 1rem;
+		font: inherit;
+		cursor: pointer;
+		border-radius: 4px;
+	}
+	.overlay-btn:hover {
+		border-color: #ff7a3d;
 	}
 </style>

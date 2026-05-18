@@ -1,5 +1,4 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
@@ -28,7 +27,6 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
 	<title>ContactSheet</title>
 </svelte:head>
 
@@ -102,7 +100,7 @@
 {@render children()}
 
 {#if photoOverlayState}
-	<PhotoOverlay data={photoOverlayState.data} />
+	<PhotoOverlay photoId={photoOverlayState.photoId} />
 {/if}
 
 <style>

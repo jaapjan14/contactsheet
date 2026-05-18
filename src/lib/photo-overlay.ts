@@ -1,36 +1,20 @@
-import { preloadData, pushState, goto } from '$app/navigation';
-import type { PhotoViewData } from '$lib/components/PhotoView.svelte';
+import { pushState } from '$app/navigation';
 
 /**
  * Open a photo as a Darkroom-style modal overlay over the current grid.
  *
- * Preloads the same data the /photo/[id] route's `+page.server.ts` would
- * load, then `pushState`s a new history entry whose state carries that data.
- * The layout's `{#if $page.state.photoOverlay}` block then mounts
- * <PhotoOverlay>. Closing the overlay does `history.back()`, popping that
- * entry — the grid below was never unmounted, so there's no scroll-restore,
- * no view-transition, no Safari gray-screen at depth.
+ * Pushes overlay state synchronously with just the photoId. The overlay
+ * component then calls `preloadData(/photo/:id)` itself — which reuses any
+ * in-flight hover-preload — and renders a loading state until the data is
+ * available. The click feels instant (overlay backdrop appears within a
+ * frame) instead of stalling on the server load before any feedback.
  *
- * Falls back to a real navigation if preload fails (e.g. 404, network).
- *
- * Returns true if the overlay opened, false if it fell through to a normal
- * navigation. Callers don't need the return value but it's there for tests.
+ * Closing the overlay does `history.back()` to pop the pushState entry —
+ * the grid below was never unmounted, so there's no scroll-restore, no
+ * view-transition, no Safari gray-screen at depth.
  */
-export async function openPhoto(photoId: string): Promise<boolean> {
-	const href = `/photo/${photoId}`;
-	try {
-		const result = await preloadData(href);
-		if (result.type === 'loaded' && result.status === 200) {
-			pushState(href, {
-				photoOverlay: { data: result.data as PhotoViewData }
-			});
-			return true;
-		}
-	} catch {
-		/* fall through */
-	}
-	await goto(href);
-	return false;
+export function openPhoto(photoId: string): void {
+	pushState(`/photo/${photoId}`, { photoOverlay: { photoId } });
 }
 
 /**
@@ -42,5 +26,5 @@ export async function openPhoto(photoId: string): Promise<boolean> {
 export function onCellClick(e: MouseEvent, photoId: string): void {
 	if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
 	e.preventDefault();
-	void openPhoto(photoId);
+	openPhoto(photoId);
 }
