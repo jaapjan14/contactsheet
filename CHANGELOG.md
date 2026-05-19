@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.4.2 (2026-05-18)
+
+### Fixed
+
+- **Discussion write errors are now actually readable** instead of a
+  misleading "Flickr took too long." Root cause was two layers:
+
+  - Flickr was returning the real error (e.g., code 2 "Cannot post to
+    group" in 192ms) but our server wrapped it in a **502 response**.
+    Cloudflare intercepts 5xx responses and replaces the body with its
+    own generic error HTML before it reaches the browser, so the
+    client only ever saw HTML 502 and fell through to the timeout
+    message.
+  - The write endpoints now return **status 422** (Unprocessable
+    Entity) for Flickr errors. 4xx codes pass through Cloudflare
+    unchanged. Status semantics are also more honest — the cause is
+    user/group state, not a server failure.
+  - Known Flickr discussion error codes get **friendly messages with
+    a hint**: code 2 → "This group doesn't allow new posts here.
+    Discussions may be closed, restricted to admins, or you may not be
+    a member."; code 99 → "You don't have permission to do that. You
+    may need to join the group, or accept group rules, before
+    posting."; etc. Mapping lives in
+    `src/lib/server/flickr/discuss-errors.ts` and is shared across all
+    four write endpoints.
+  - Client `errorFrom` reads the new `hint` field and appends it after
+    the primary message so the UI surfaces both.
+
 ## v1.4.1 (2026-05-18)
 
 ### Fixed

@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { resolveGroupId } from '$lib/server/flickr/groups';
 import { addTopic, getGroupDiscussTopics } from '$lib/server/flickr/discussions';
+import { discussErrorResponse } from '$lib/server/flickr/discuss-errors';
 import type { RequestHandler } from './$types';
 
 async function resolveOr404(input: string): Promise<string> {
@@ -51,10 +52,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		const elapsed = Date.now() - t0;
 		if (err instanceof FlickrError) {
 			console.warn(`[discuss.topics.add] flickr-error group=${groupId} code=${err.code} msg="${err.message}" elapsed=${elapsed}ms`);
-			return json(
-				{ error: err.message, code: err.code },
-				{ status: 502 }
-			);
+			const r = discussErrorResponse(err.code, err.message);
+			return json(r.body, { status: r.status });
 		}
 		console.error(`[discuss.topics.add] unknown-error group=${groupId} elapsed=${elapsed}ms`, err);
 		throw err;

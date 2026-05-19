@@ -108,8 +108,13 @@
 		const ct = res.headers.get('content-type') ?? '';
 		if (ct.includes('application/json')) {
 			try {
-				const body = (await res.json()) as { message?: string; error?: string };
-				msg = body.message || body.error || msg;
+				const body = (await res.json()) as {
+					message?: string;
+					error?: string;
+					hint?: string;
+				};
+				const base = body.message || body.error || msg;
+				msg = body.hint ? `${base} ${body.hint}` : base;
 			} catch {
 				/* fall through */
 			}
