@@ -268,6 +268,113 @@ export interface UrlsLookupGroupResponse {
 	group: { id: string; groupname: FlickrTextNode };
 }
 
+// Group discussions ---------------------------------------------------------
+
+export interface FlickrDiscussTopic {
+	id: string;
+	subject: string;
+	author: string;
+	authorname: string;
+	author_iconserver?: string;
+	author_iconfarm?: number;
+	author_path_alias?: string | null;
+	author_role?: string;
+	is_sticky?: number;
+	is_locked?: number;
+	can_edit?: number;
+	can_delete?: number;
+	can_reply?: number;
+	datecreate: string;
+	datelastpost: string;
+	count_replies: string;
+	message?: FlickrTextNode;
+}
+
+export interface FlickrDiscussReply {
+	id: string;
+	author: string;
+	authorname: string;
+	author_iconserver?: string;
+	author_iconfarm?: number;
+	author_path_alias?: string | null;
+	author_role?: string;
+	can_edit?: number;
+	can_delete?: number;
+	datecreate: string;
+	lastedit?: string;
+	message: FlickrTextNode;
+}
+
+export interface FlickrDiscussTopicHead {
+	topic_id: string;
+	subject: string;
+	group_id: string;
+	iconserver?: string;
+	iconfarm?: number;
+	name?: string;
+	author: string;
+	authorname: string;
+	author_iconserver?: string;
+	author_iconfarm?: number;
+	author_path_alias?: string | null;
+	author_role?: string;
+	is_sticky?: number;
+	is_locked?: number;
+	can_edit?: number;
+	can_delete?: number;
+	can_reply?: number;
+	datecreate: string;
+	datelastpost: string;
+	total_replies?: string;
+	message: FlickrTextNode;
+}
+
+export interface TopicsPage {
+	page: number;
+	pages: number;
+	per_page: number;
+	total: number;
+	topic: FlickrDiscussTopic[];
+}
+
+export interface RepliesPage {
+	topic: FlickrDiscussTopicHead;
+	page: number;
+	pages: number;
+	per_page: number;
+	total: number;
+	reply: FlickrDiscussReply[];
+}
+
+export interface DiscussTopicsGetListResponse {
+	stat: string;
+	topics: {
+		group_id: string;
+		iconserver?: string;
+		iconfarm?: number;
+		name?: string;
+		members?: string;
+		privacy?: string;
+		page: number | string;
+		per_page: number | string;
+		pages: number | string;
+		total: number | string;
+		topic?: FlickrDiscussTopic[];
+	};
+}
+
+export interface DiscussRepliesGetListResponse {
+	stat: string;
+	replies: {
+		topic: FlickrDiscussTopicHead;
+		page: number | string;
+		per_page: number | string;
+		pages: number | string;
+		total: number | string;
+		reply?: FlickrDiscussReply[];
+	};
+}
+
 export interface FlickrGroupSearchResult {
 	nsid: string;
 	name: string;

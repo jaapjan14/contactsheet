@@ -19,119 +19,13 @@
 </script>
 
 <script lang="ts">
-	import { untrack, onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { photoUrl } from '$lib/flickr/urls';
 	import { onCellClick } from '$lib/photo-overlay';
+	import GroupChrome from '$lib/components/GroupChrome.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
-	// Membership state — lazy-loaded via /api/group/[id]/membership so the
-	// SSR'd group page doesn't pay a people.getGroups round-trip on every
-	// public hit. Only the authed-self gets the join/leave button.
-	type MembershipState = { signedIn: boolean; member: boolean };
-	let membership = $state<MembershipState | null>(null);
-	let membershipPending = $state(false);
-	let membershipError: string | null = $state(null);
-	// Some groups require rules acceptance — Flickr returns error 99 unless
-	// `accept_rules=1` is passed. On first 409 from the server we open this
-	// modal showing the group's rules; "I agree" re-POSTs with the flag.
-	let rulesModalOpen = $state(false);
-	let agreeing = $state(false);
-
-	async function fetchMembership() {
-		try {
-			const res = await fetch(
-				`/api/group/${encodeURIComponent(data.groupKey)}/membership`
-			);
-			if (!res.ok) return;
-			membership = (await res.json()) as MembershipState;
-		} catch {
-			/* silent — button stays hidden if we can't determine */
-		}
-	}
-
-	onMount(fetchMembership);
-
-	let lastMembershipKey = untrack(() => data.groupKey);
-	$effect(() => {
-		if (data.groupKey === lastMembershipKey) return;
-		lastMembershipKey = data.groupKey;
-		membership = null;
-		membershipError = null;
-		fetchMembership();
-	});
-
-	async function membershipErrorFrom(res: Response): Promise<string> {
-		let msg = `HTTP ${res.status}`;
-		const ct = res.headers.get('content-type') ?? '';
-		if (ct.includes('application/json')) {
-			try {
-				const body = (await res.json()) as { message?: string; error?: string };
-				msg = body.message || body.error || msg;
-			} catch {
-				/* fall through */
-			}
-		} else if (res.status === 502 || res.status === 504) {
-			msg = 'Flickr took too long — try again.';
-		}
-		return msg;
-	}
-
-	async function toggleMembership() {
-		if (!membership || membershipPending) return;
-		const wantJoin = !membership.member;
-		membershipPending = true;
-		membershipError = null;
-		// Optimistic for leave only — for join, we wait on the server because
-		// a rules-gated group will need a separate "I agree" round-trip.
-		if (!wantJoin) membership = { ...membership, member: false };
-		try {
-			const res = await fetch(
-				`/api/group/${encodeURIComponent(data.groupKey)}/membership`,
-				{ method: wantJoin ? 'POST' : 'DELETE' }
-			);
-			if (wantJoin && res.status === 409) {
-				rulesModalOpen = true;
-				return;
-			}
-			if (!res.ok) throw new Error(await membershipErrorFrom(res));
-			const result = (await res.json()) as { member: boolean };
-			membership = { signedIn: true, member: result.member };
-		} catch (err) {
-			if (!wantJoin) membership = { ...membership, member: true };
-			membershipError = (err as Error).message;
-		} finally {
-			membershipPending = false;
-		}
-	}
-
-	async function agreeAndJoin() {
-		if (agreeing || !membership) return;
-		agreeing = true;
-		membershipError = null;
-		try {
-			const res = await fetch(
-				`/api/group/${encodeURIComponent(data.groupKey)}/membership`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ acceptRules: true })
-				}
-			);
-			if (!res.ok) throw new Error(await membershipErrorFrom(res));
-			membership = { signedIn: true, member: true };
-			rulesModalOpen = false;
-		} catch (err) {
-			membershipError = (err as Error).message;
-		} finally {
-			agreeing = false;
-		}
-	}
-
-	function cancelJoin() {
-		rulesModalOpen = false;
-	}
 
 	const restored = untrack(() =>
 		snapHolder?.groupKey === data.groupKey && snapHolder?.query === data.query
@@ -151,14 +45,6 @@
 	// submits to /group/[id]?q=… and the server reloads in search mode.
 	let searchDraft = $state(untrack(() => data.query));
 	let sentinelEl: HTMLElement | null = $state(null);
-
-	const groupIcon = $derived.by(() => {
-		const g = data.group;
-		if (!g.iconserver || g.iconserver === '0') {
-			return 'https://www.flickr.com/images/buddyicon.gif';
-		}
-		return `https://farm${g.iconfarm}.staticflickr.com/${g.iconserver}/buddyicons/${g.id}.jpg`;
-	});
 
 	function back() {
 		if (typeof window === 'undefined') return;
@@ -243,48 +129,26 @@
 	<button type="button" class="back" onclick={back}>← Back</button>
 </nav>
 
-<header class="group-header">
-	<img class="icon" src={groupIcon} alt="" />
-	<div class="who">
-		<h1>{data.group.name._content}</h1>
-		<p class="meta">
-			{Number(data.group.members?._content ?? 0).toLocaleString()} members ·
-			{Number(data.group.pool_count?._content ?? data.photos.total).toLocaleString()} photos in pool
-		</p>
-		{#if membershipError}<p class="membership-error">{membershipError}</p>{/if}
-	</div>
-	{#if membership && membership.signedIn}
-		<button
-			type="button"
-			class="member-btn"
-			class:joined={membership.member}
-			onclick={toggleMembership}
-			disabled={membershipPending}
-			title={membership.member ? 'Leave this group' : 'Join this group'}
-		>
-			{#if membershipPending}
-				…
-			{:else if membership.member}
-				✓ Joined
-			{:else}
-				+ Join group
-			{/if}
-		</button>
+<GroupChrome
+	group={data.group}
+	groupKey={data.groupKey}
+	activeTab="photos"
+	poolCount={Number(data.group.pool_count?._content ?? data.photos.total)}
+/>
+
+<form class="group-search" method="get" action="/group/{data.groupKey}" role="search">
+	<input
+		name="q"
+		type="search"
+		placeholder="Search photos in this group…"
+		bind:value={searchDraft}
+		autocomplete="off"
+		aria-label="Search this group"
+	/>
+	{#if data.query}
+		<a class="clear" href="/group/{data.groupKey}" title="Clear search">×</a>
 	{/if}
-	<form class="group-search" method="get" action="/group/{data.groupKey}" role="search">
-		<input
-			name="q"
-			type="search"
-			placeholder="Search this group…"
-			bind:value={searchDraft}
-			autocomplete="off"
-			aria-label="Search this group"
-		/>
-		{#if data.query}
-			<a class="clear" href="/group/{data.groupKey}" title="Clear search">×</a>
-		{/if}
-	</form>
-</header>
+</form>
 
 {#if data.poolError}
 	<p class="empty">
@@ -326,37 +190,10 @@
 	{/if}
 {/if}
 
-{#if rulesModalOpen}
-	<div class="rules-backdrop" role="dialog" aria-modal="true" aria-labelledby="rules-title">
-		<div class="rules-modal">
-			<h2 id="rules-title">Group rules</h2>
-			<p class="rules-intro">
-				If you agree to these rules, you can join <strong>{data.group.name._content}</strong>.
-			</p>
-			<div class="rules-body">
-				{#if data.group.rules?._content}
-					{@html data.group.rules._content}
-				{:else}
-					<p><em>This group did not publish rules text, but Flickr still requires you to acknowledge that rules exist before joining.</em></p>
-				{/if}
-			</div>
-			{#if membershipError}<p class="membership-error">{membershipError}</p>{/if}
-			<div class="rules-actions">
-				<button type="button" class="rules-cancel" onclick={cancelJoin} disabled={agreeing}>
-					No, thanks
-				</button>
-				<button type="button" class="rules-agree" onclick={agreeAndJoin} disabled={agreeing}>
-					{agreeing ? 'Joining…' : 'I agree'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
 <style>
 	.topnav {
 		max-width: 80rem;
-		margin: 1.5rem auto 0;
+		margin: 1rem auto 0;
 		padding: 0 1.5rem;
 	}
 	.back {
@@ -373,78 +210,13 @@
 		border-color: var(--accent);
 		color: var(--accent);
 	}
-	.group-header {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		max-width: 80rem;
-		margin: 1rem auto 1rem;
-		padding: 0 1.5rem;
-		border-bottom: 1px solid var(--border);
-		padding-bottom: 1rem;
-	}
-	.icon {
-		width: 64px;
-		height: 64px;
-		border-radius: 4px;
-		background: var(--bg-elev);
-	}
-	.who h1 {
-		margin: 0;
-		font-family: var(--font-sans);
-		font-weight: 500;
-		font-size: 1.5rem;
-		letter-spacing: -0.01em;
-	}
-	.meta {
-		margin: 0.25rem 0 0;
-		color: var(--fg-muted);
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-	}
-	.member-btn {
-		margin-left: auto;
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		padding: 0.45rem 0.9rem;
-		border-radius: 3px;
-		background: var(--bg-elev);
-		color: var(--accent);
-		border: 1px solid var(--border);
-		cursor: pointer;
-		white-space: nowrap;
-		transition: border-color 0.15s, color 0.15s;
-	}
-	/* When no membership button exists (anonymous viewer), let the search box
-	   take the auto-margin instead so it stays right-aligned. */
-	.who + .group-search {
-		margin-left: auto;
-	}
-	.member-btn:hover:not(:disabled) {
-		border-color: var(--accent);
-	}
-	.member-btn:disabled {
-		opacity: 0.6;
-		cursor: progress;
-	}
-	.member-btn.joined {
-		color: #6cd58a;
-		border-color: #2c5a3a;
-		background: rgba(108, 213, 138, 0.06);
-	}
-	.member-btn.joined:hover:not(:disabled) {
-		border-color: #6cd58a;
-	}
-	.membership-error {
-		margin: 0.25rem 0 0;
-		color: #ff6b6b;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-	}
 	.group-search {
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
+		max-width: 80rem;
+		margin: 0.85rem auto 0;
+		padding: 0 1.5rem;
 		min-width: 0;
 	}
 	.group-search input {
@@ -482,16 +254,13 @@
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
 	}
-	.search-meta code {
-		color: #c8c8c8;
-	}
+	.search-meta code,
 	.empty code {
 		color: #c8c8c8;
 	}
 	@media (max-width: 600px) {
 		.group-search {
-			margin-left: 0;
-			flex-basis: 100%;
+			padding: 0 1rem;
 		}
 		.group-search input {
 			flex: 1;
@@ -544,87 +313,5 @@
 	}
 	.empty {
 		font-size: 0.9rem;
-	}
-	.rules-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.7);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		padding: 1.5rem;
-	}
-	.rules-modal {
-		background: var(--bg-elev);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		max-width: 32rem;
-		width: 100%;
-		max-height: 80vh;
-		display: flex;
-		flex-direction: column;
-		padding: 1.5rem;
-		gap: 0.85rem;
-		font-family: var(--font-sans);
-	}
-	.rules-modal h2 {
-		margin: 0;
-		font-size: 1.1rem;
-		font-weight: 600;
-	}
-	.rules-intro {
-		margin: 0;
-		font-size: 0.88rem;
-		color: var(--fg-muted);
-	}
-	.rules-body {
-		overflow-y: auto;
-		font-size: 0.9rem;
-		line-height: 1.5;
-		padding: 0.85rem 1rem;
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		flex: 1;
-	}
-	.rules-body :global(a) {
-		color: var(--accent);
-	}
-	.rules-actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.6rem;
-	}
-	.rules-cancel,
-	.rules-agree {
-		font-family: var(--font-mono);
-		font-size: 0.8rem;
-		padding: 0.5rem 1rem;
-		border-radius: 3px;
-		cursor: pointer;
-		border: 1px solid var(--border);
-	}
-	.rules-cancel {
-		background: var(--bg-elev);
-		color: var(--fg-muted);
-	}
-	.rules-cancel:hover:not(:disabled) {
-		color: var(--fg);
-		border-color: var(--fg-muted);
-	}
-	.rules-agree {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-		font-weight: 500;
-	}
-	.rules-agree:hover:not(:disabled) {
-		filter: brightness(1.1);
-	}
-	.rules-agree:disabled,
-	.rules-cancel:disabled {
-		opacity: 0.6;
-		cursor: progress;
 	}
 </style>

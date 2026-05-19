@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.3.0 (2026-05-18)
+
+### Added
+
+- **Group discussions viewer (Phase 1, read-only).** New "Discussions" tab on
+  `/group/[id]` alongside the existing photo pool. Two new routes:
+  - `/group/[id]/discussions` — topic list (subject, author, reply count,
+    relative last-post date, sticky/locked badges), paginated via
+    infinite-scroll against a new `/api/group/[id]/discussions` endpoint.
+  - `/group/[id]/discussions/[topicId]` — full thread view: OP body plus
+    every reply with the author's buddyicon, name, and post date.
+    Paginated via `/api/discuss/[topicId]/replies`. HTML bodies run
+    through the existing `decodeFlickrEntities` → `sanitizeFlickrHtml`
+    pipeline so `<a>`/`<br>` survive and everything else is stripped.
+  - Backed by `getGroupDiscussTopics` + `getDiscussTopicReplies` in a new
+    `src/lib/server/flickr/discussions.ts`, both cached 5min via the
+    existing SQLite layer, both `flickrMaybeSigned` so members-only
+    groups still work for signed-in viewers.
+  - **`<GroupChrome>` extracted** (`src/lib/components/GroupChrome.svelte`)
+    holding the icon + name + meta + join/leave button + rules-acceptance
+    modal + tab strip + mobile section-select. Both `/group/[id]` and
+    `/group/[id]/discussions` render through it; the existing pool page
+    lost ~120 lines of duplicated membership logic in the refactor.
+  - Phase 2 (post replies, edit/delete) and Phase 3 (FTS5 search across
+    crawled topics) are deferred to follow-up sessions per the agreed
+    phasing.
+
 ## v1.2.0 (2026-05-18)
 
 ### Performance
