@@ -1921,7 +1921,11 @@
 		font-size: 0.75rem;
 	}
 	.comment header a {
-		color: var(--fg);
+		color: var(--accent);
+		font-weight: 500;
+	}
+	.comment header a:hover {
+		text-decoration: underline;
 	}
 	.comment header time {
 		color: var(--fg-muted);

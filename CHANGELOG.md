@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.5 (2026-05-18)
+
+### Changed
+
+- **Commenter names on the photo lightbox now use the accent color**
+  (matching how author links read everywhere else in the app —
+  discussion threads, byline, search) instead of plain foreground.
+  Subtle weight bump too. Offsets the name from the message body so
+  the eye can scan the commenter at a glance.
+
 ## v1.4.4 (2026-05-18)
 
 ### Changed
