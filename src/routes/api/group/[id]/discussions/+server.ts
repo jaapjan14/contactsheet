@@ -27,6 +27,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 };
 
 export const POST: RequestHandler = async ({ params, request }) => {
+	const t0 = Date.now();
 	let body: { subject?: string; message?: string };
 	try {
 		body = (await request.json()) as { subject?: string; message?: string };
@@ -39,22 +40,23 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	if (!message) throw error(400, 'Message is required');
 
 	const groupId = await resolveOr404(params.id);
+	console.log(`[discuss.topics.add] start group=${groupId} subject="${subject.slice(0, 60)}" msgLen=${message.length}`);
 
 	try {
 		const topicId = await addTopic(groupId, subject, message);
+		const elapsed = Date.now() - t0;
+		console.log(`[discuss.topics.add] ok group=${groupId} topicId=${topicId} elapsed=${elapsed}ms`);
 		return json({ ok: true, topicId });
 	} catch (err) {
-		// Return a JSON error body so the client's errorFrom() can show
-		// Flickr's actual message ("Discussions are disabled for this group",
-		// "Insufficient permissions", etc.) instead of a generic "took too long."
-		// `throw error()` serves an HTML page when Accept isn't json, which is
-		// what fetch() defaults to.
+		const elapsed = Date.now() - t0;
 		if (err instanceof FlickrError) {
+			console.warn(`[discuss.topics.add] flickr-error group=${groupId} code=${err.code} msg="${err.message}" elapsed=${elapsed}ms`);
 			return json(
 				{ error: err.message, code: err.code },
 				{ status: 502 }
 			);
 		}
+		console.error(`[discuss.topics.add] unknown-error group=${groupId} elapsed=${elapsed}ms`, err);
 		throw err;
 	}
 };

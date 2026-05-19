@@ -16,6 +16,7 @@ async function resolveGroupOr400(raw: unknown): Promise<string> {
 }
 
 export const PATCH: RequestHandler = async ({ params, request }) => {
+	const t0 = Date.now();
 	let body: { subject?: string; message?: string; group_id?: string };
 	try {
 		body = (await request.json()) as {
@@ -31,18 +32,25 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	if (!subject || !message) throw error(400, 'subject and message are required');
 	const groupId = await resolveGroupOr400(body.group_id);
 
+	console.log(`[discuss.topics.edit] start topic=${params.topicId} group=${groupId} subject="${subject.slice(0, 60)}"`);
 	try {
 		await editTopic(params.topicId, groupId, subject, message);
+		const elapsed = Date.now() - t0;
+		console.log(`[discuss.topics.edit] ok topic=${params.topicId} elapsed=${elapsed}ms`);
 		return json({ ok: true });
 	} catch (err) {
+		const elapsed = Date.now() - t0;
 		if (err instanceof FlickrError) {
+			console.warn(`[discuss.topics.edit] flickr-error topic=${params.topicId} code=${err.code} msg="${err.message}" elapsed=${elapsed}ms`);
 			return json({ error: err.message, code: err.code }, { status: 502 });
 		}
+		console.error(`[discuss.topics.edit] unknown-error topic=${params.topicId} elapsed=${elapsed}ms`, err);
 		throw err;
 	}
 };
 
 export const DELETE: RequestHandler = async ({ params, request, url }) => {
+	const t0 = Date.now();
 	let groupParam = url.searchParams.get('group_id') ?? '';
 	if (!groupParam) {
 		try {
@@ -54,13 +62,19 @@ export const DELETE: RequestHandler = async ({ params, request, url }) => {
 	}
 	const groupId = await resolveGroupOr400(groupParam);
 
+	console.log(`[discuss.topics.delete] start topic=${params.topicId} group=${groupId}`);
 	try {
 		await deleteTopic(params.topicId, groupId);
+		const elapsed = Date.now() - t0;
+		console.log(`[discuss.topics.delete] ok topic=${params.topicId} elapsed=${elapsed}ms`);
 		return json({ ok: true });
 	} catch (err) {
+		const elapsed = Date.now() - t0;
 		if (err instanceof FlickrError) {
+			console.warn(`[discuss.topics.delete] flickr-error topic=${params.topicId} code=${err.code} msg="${err.message}" elapsed=${elapsed}ms`);
 			return json({ error: err.message, code: err.code }, { status: 502 });
 		}
+		console.error(`[discuss.topics.delete] unknown-error topic=${params.topicId} elapsed=${elapsed}ms`, err);
 		throw err;
 	}
 };

@@ -31,6 +31,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 };
 
 export const POST: RequestHandler = async ({ params, request }) => {
+	const t0 = Date.now();
 	let body: { message?: string; group_id?: string };
 	try {
 		body = (await request.json()) as { message?: string; group_id?: string };
@@ -50,13 +51,19 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		throw err;
 	}
 
+	console.log(`[discuss.replies.add] start topic=${params.topicId} group=${groupId} msgLen=${message.length}`);
 	try {
 		const replyId = await addReply(params.topicId, groupId, message);
+		const elapsed = Date.now() - t0;
+		console.log(`[discuss.replies.add] ok topic=${params.topicId} replyId=${replyId} elapsed=${elapsed}ms`);
 		return json({ ok: true, replyId });
 	} catch (err) {
+		const elapsed = Date.now() - t0;
 		if (err instanceof FlickrError) {
+			console.warn(`[discuss.replies.add] flickr-error topic=${params.topicId} code=${err.code} msg="${err.message}" elapsed=${elapsed}ms`);
 			return json({ error: err.message, code: err.code }, { status: 502 });
 		}
+		console.error(`[discuss.replies.add] unknown-error topic=${params.topicId} elapsed=${elapsed}ms`, err);
 		throw err;
 	}
 };
