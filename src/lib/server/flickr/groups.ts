@@ -99,22 +99,11 @@ export async function resolveGroupId(input: string): Promise<string> {
  * requests. flickrMaybeSigned attaches Jacob's token if present.
  */
 export async function getGroupInfo(groupId: string): Promise<FlickrGroupInfo> {
-	// TEMP DEBUG (2026-05-18): cache key suffix bumped to force one cold fetch
-	// so the debug log below actually fires for groups already in the SQLite
-	// cache. Revert to 'groups.getInfo' once we've identified the
-	// discussions-disabled signal.
-	return wrap(key('groups.getInfo.debug', { group_id: groupId }), TTL_INFO, async () => {
+	return wrap(key('groups.getInfo', { group_id: groupId }), TTL_INFO, async () => {
 		const res = await flickrMaybeSigned<GroupsGetInfoResponse>({
 			method: 'flickr.groups.getInfo',
 			params: { group_id: groupId }
 		});
-		// TEMP DEBUG (2026-05-18): hunting for the "discussions disabled" field.
-		// Remove once we know which key on the group payload reflects that
-		// state.
-		console.log(
-			`[debug.groups.getInfo] group=${groupId} raw=`,
-			JSON.stringify(res.group).slice(0, 1200)
-		);
 		return res.group;
 	});
 }

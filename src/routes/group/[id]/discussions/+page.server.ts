@@ -49,11 +49,24 @@ export const load: PageServerLoad = async ({ params }) => {
 		}
 	}
 
+	// Detect Flickr's "Discussions disabled for this group" state. Flickr
+	// doesn't expose an explicit flag in `groups.getInfo`, but it surfaces the
+	// state as a discrepancy: the group profile keeps reporting `topic_count`
+	// from before discussions were turned off, while `topics.getList` returns
+	// `total: 0` and an empty page. Verified 2026-05-18 against a real group
+	// where Flickr's own UI showed "Discussions are disabled for this group."
+	// This heuristic also catches "all topics deleted but discussions still
+	// enabled" — rare enough that the same UI treatment is acceptable.
+	const profiledTopicCount = Number(info.topic_count?._content ?? '0') || 0;
+	const discussionsDisabled =
+		!topicsError && profiledTopicCount > 0 && topics.total === 0;
+
 	return {
 		groupKey: params.id,
 		groupId,
 		group: info,
 		topics,
-		topicsError
+		topicsError,
+		discussionsDisabled
 	};
 };

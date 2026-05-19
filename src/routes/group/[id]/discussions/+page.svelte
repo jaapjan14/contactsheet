@@ -187,7 +187,7 @@
 
 <GroupChrome group={data.group} groupKey={data.groupKey} activeTab="discussions" />
 
-{#if data.me}
+{#if data.me && !data.discussionsDisabled}
 	<div class="compose-bar">
 		{#if !composeOpen}
 			<button type="button" class="new-topic-btn" onclick={() => (composeOpen = true)}>
@@ -232,6 +232,14 @@
 
 {#if data.topicsError}
 	<p class="empty">Can't read discussions for this group — {data.topicsError}.</p>
+{:else if data.discussionsDisabled}
+	<div class="disabled-notice">
+		<h2>Discussions are disabled for this group.</h2>
+		<p>
+			The group admin has turned off the discussion board.
+			<a href="/group/{data.groupKey}">Go to the photo pool</a> instead.
+		</p>
+	</div>
 {:else if topics.length === 0}
 	<p class="empty">No discussion topics in this group yet.</p>
 {:else}
@@ -297,6 +305,29 @@
 	}
 	.back:hover {
 		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.disabled-notice {
+		max-width: 80rem;
+		margin: 2rem auto;
+		padding: 1.5rem;
+		text-align: center;
+		color: var(--fg-muted);
+		font-family: var(--font-sans);
+	}
+	.disabled-notice h2 {
+		margin: 0 0 0.5rem;
+		font-weight: 500;
+		font-size: 1.1rem;
+		color: var(--fg);
+		letter-spacing: -0.01em;
+	}
+	.disabled-notice p {
+		margin: 0;
+		font-size: 0.9rem;
+	}
+	.disabled-notice a {
 		color: var(--accent);
 	}
 

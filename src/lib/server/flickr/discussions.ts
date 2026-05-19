@@ -29,8 +29,7 @@ export async function getGroupDiscussTopics(
 	perPage = DEFAULT_TOPICS_PER_PAGE
 ): Promise<TopicsPage> {
 	return wrap(
-		// TEMP DEBUG (2026-05-18): cache key suffix bumped to force cold fetch.
-		key('groups.discuss.topics.getList.debug', { group_id: groupId, page, per_page: perPage }),
+		key('groups.discuss.topics.getList', { group_id: groupId, page, per_page: perPage }),
 		TTL_TOPICS,
 		async () => {
 			const res = await flickrMaybeSigned<DiscussTopicsGetListResponse>({
@@ -41,14 +40,6 @@ export async function getGroupDiscussTopics(
 					page: String(page)
 				}
 			});
-			// TEMP DEBUG (2026-05-18): looking for a field on the topics-list
-			// response that signals "discussions disabled" so we can show the
-			// proactive notice without making the user attempt a post. Remove
-			// once we have the answer.
-			console.log(
-				`[debug.topics.getList] group=${groupId} page=${page} raw=`,
-				JSON.stringify(res.topics).slice(0, 600)
-			);
 			return {
 				page: Number(res.topics.page) || page,
 				pages: Number(res.topics.pages) || 0,

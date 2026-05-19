@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.4.3 (2026-05-18)
+
+### Added
+
+- **Proactive "Discussions are disabled" notice** on `/group/[id]/discussions`
+  when the group has discussions turned off, mirroring Flickr's own UI
+  treatment. The "+ New topic" button is hidden in this state so the
+  user doesn't waste time composing a post that would be rejected.
+
+  Detection heuristic: Flickr doesn't expose an explicit
+  `discussions_enabled` flag in `groups.getInfo`, but it surfaces the
+  state as a discrepancy — the group profile keeps reporting
+  `topic_count > 0` from before discussions were disabled, while
+  `topics.getList` returns `total: 0` and an empty page. Verified
+  against a real closed-discussions group where Flickr's own UI
+  shows the same disabled-state banner. Also catches the rare "all
+  topics deleted but discussions still enabled" case, which deserves
+  the same UI treatment.
+
+  `topic_count` is now exposed on `FlickrGroupInfo`. The detection
+  lives in `src/routes/group/[id]/discussions/+page.server.ts` and is
+  threaded to the page via a new `discussionsDisabled` boolean in
+  `PageData`.
+
 ## v1.4.2 (2026-05-18)
 
 ### Fixed

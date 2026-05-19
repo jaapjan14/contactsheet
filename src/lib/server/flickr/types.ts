@@ -248,6 +248,7 @@ export interface FlickrGroupInfo {
 	description?: FlickrTextNode;
 	members: FlickrTextNode;
 	pool_count?: FlickrTextNode;
+	topic_count?: FlickrTextNode;
 	rules?: FlickrTextNode;
 	throttle?: { count: number; mode: string; remaining: number };
 	privacy?: number;
