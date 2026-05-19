@@ -44,7 +44,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		const topicId = await addTopic(groupId, subject, message);
 		return json({ ok: true, topicId });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		// Return a JSON error body so the client's errorFrom() can show
+		// Flickr's actual message ("Discussions are disabled for this group",
+		// "Insufficient permissions", etc.) instead of a generic "took too long."
+		// `throw error()` serves an HTML page when Accept isn't json, which is
+		// what fetch() defaults to.
+		if (err instanceof FlickrError) {
+			return json(
+				{ error: err.message, code: err.code },
+				{ status: 502 }
+			);
+		}
 		throw err;
 	}
 };

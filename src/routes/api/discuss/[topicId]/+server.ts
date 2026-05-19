@@ -35,7 +35,9 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		await editTopic(params.topicId, groupId, subject, message);
 		return json({ ok: true });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		if (err instanceof FlickrError) {
+			return json({ error: err.message, code: err.code }, { status: 502 });
+		}
 		throw err;
 	}
 };
@@ -56,7 +58,9 @@ export const DELETE: RequestHandler = async ({ params, request, url }) => {
 		await deleteTopic(params.topicId, groupId);
 		return json({ ok: true });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		if (err instanceof FlickrError) {
+			return json({ error: err.message, code: err.code }, { status: 502 });
+		}
 		throw err;
 	}
 };

@@ -54,7 +54,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		const replyId = await addReply(params.topicId, groupId, message);
 		return json({ ok: true, replyId });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		if (err instanceof FlickrError) {
+			return json({ error: err.message, code: err.code }, { status: 502 });
+		}
 		throw err;
 	}
 };

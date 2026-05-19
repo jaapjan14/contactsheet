@@ -30,7 +30,9 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		await editReply(params.topicId, params.replyId, groupId, message);
 		return json({ ok: true });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		if (err instanceof FlickrError) {
+			return json({ error: err.message, code: err.code }, { status: 502 });
+		}
 		throw err;
 	}
 };
@@ -53,7 +55,9 @@ export const DELETE: RequestHandler = async ({ params, request, url }) => {
 		await deleteReply(params.topicId, params.replyId, groupId);
 		return json({ ok: true });
 	} catch (err) {
-		if (err instanceof FlickrError) throw error(502, err.message);
+		if (err instanceof FlickrError) {
+			return json({ error: err.message, code: err.code }, { status: 502 });
+		}
 		throw err;
 	}
 };

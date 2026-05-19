@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.4.1 (2026-05-18)
+
+### Fixed
+
+- **Discussion write errors now show the real Flickr message** instead of
+  a generic "Flickr took too long — try again." The API endpoints were
+  using SvelteKit's `throw error(502, msg)`, which returns an HTML error
+  page when the request doesn't `Accept: application/json` (the default
+  for fetch). The client `errorFrom()` saw HTML + 502 and fell through
+  to the generic timeout message. Now all four discussion write
+  endpoints (POST topic, POST reply, PATCH/DELETE reply, PATCH/DELETE
+  topic) return `json({ error, code }, { status: 502 })` on FlickrError,
+  so the actual cause (e.g. "Discussions are disabled for this group",
+  "Insufficient permissions") surfaces inline.
+
 ## v1.4.0 (2026-05-18)
 
 ### Added
