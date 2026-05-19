@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.5.0 (2026-05-18)
+
+### Added
+
+- **User lookup now resolves display names with spaces** (e.g.,
+  "Andy Johnsson") via `flickr.people.search`. Previously, the
+  resolver tried `urls.lookupUser` (path-alias / URL) and
+  `people.findByUsername` (login screen-name only) — neither
+  matches a multi-word display name, so paste-the-name-into-the-home-form
+  hit a 404 for any user whose path-alias didn't share their public
+  name. The new third attempt calls Flickr's signed-only
+  `flickr.people.search`, which is the same endpoint behind
+  flickr.com's site-wide "People" tab, and auto-picks the
+  highest-ranked result. Same-name ambiguity ("John Smith") is a known
+  trade-off; future work could surface a disambiguation page.
+
+  Cache key for `resolveUserId` also picks up the `sig=1` / `sig=0`
+  auth suffix introduced in v1.4.4, so the new signed-only fallback
+  doesn't pollute the anonymous cache slot.
+
 ## v1.4.6 (2026-05-18)
 
 ### Fixed
