@@ -5,9 +5,56 @@
 
 	let { data }: { data: PageData } = $props();
 
-	type Sort = 'default' | 'name';
+	type Sort = 'default' | 'name' | 'activity';
 	let query = $state('');
 	let sort = $state<Sort>('default');
+
+	// dateactivity (unix seconds, string) per group NSID — populated lazily
+	// the first time the user selects the Activity sort. Pages with ~100
+	// groups hit the cache after the first crawl, so subsequent renders are
+	// effectively instant.
+	let activityMap = $state<Record<string, string | null>>({});
+	let activityLoading = $state(false);
+	let activityError: string | null = $state(null);
+
+	async function loadActivity() {
+		if (activityLoading || Object.keys(activityMap).length > 0) return;
+		activityLoading = true;
+		activityError = null;
+		try {
+			const ids = data.groups.map((g) => g.nsid).join(',');
+			const res = await fetch(`/api/groups/activity?ids=${encodeURIComponent(ids)}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const body = (await res.json()) as { activity: Record<string, string | null> };
+			activityMap = body.activity ?? {};
+		} catch (err) {
+			activityError = (err as Error).message;
+		} finally {
+			activityLoading = false;
+		}
+	}
+
+	async function pickActivity() {
+		sort = 'activity';
+		await loadActivity();
+	}
+
+	function relativeDate(unixSeconds: string): string {
+		const t = Number(unixSeconds) * 1000;
+		if (!t) return '';
+		const diffMs = Date.now() - t;
+		const m = Math.floor(diffMs / 60_000);
+		if (m < 1) return 'just now';
+		if (m < 60) return `${m}m ago`;
+		const h = Math.floor(m / 60);
+		if (h < 24) return `${h}h ago`;
+		const d = Math.floor(h / 24);
+		if (d < 30) return `${d}d ago`;
+		const mo = Math.floor(d / 30);
+		if (mo < 12) return `${mo}mo ago`;
+		const y = Math.floor(mo / 12);
+		return `${y}y ago`;
+	}
 
 	const view = $derived.by(() => {
 		const q = query.trim().toLowerCase();
@@ -20,6 +67,13 @@
 			: decoded;
 		if (sort === 'name') {
 			return [...filtered].sort((a, b) => a.displayName.localeCompare(b.displayName));
+		}
+		if (sort === 'activity') {
+			return [...filtered].sort((a, b) => {
+				const ta = Number(activityMap[a.nsid] ?? 0);
+				const tb = Number(activityMap[b.nsid] ?? 0);
+				return tb - ta; // descending
+			});
 		}
 		return filtered;
 	});
@@ -54,18 +108,37 @@
 			<button class:active={sort === 'name'} onclick={() => (sort = 'name')}>
 				A–Z
 			</button>
+			<button
+				class:active={sort === 'activity'}
+				onclick={pickActivity}
+				disabled={activityLoading}
+				title={activityLoading
+					? 'Fetching last-activity for each group…'
+					: 'Sort by most recent group activity'}
+			>
+				{activityLoading ? 'Activity…' : 'Activity'}
+			</button>
 		</div>
 	</div>
+	{#if activityError}
+		<p class="activity-error">Couldn't load activity: {activityError}.</p>
+	{/if}
 	{#if view.length === 0}
 		<p class="empty">No matches.</p>
 	{:else}
 		<ul class="groups">
 			{#each view as g (g.nsid)}
+				{@const ts = activityMap[g.nsid]}
 				<li>
 					<a href="/group/{g.nsid}">
 						<span class="name">{g.displayName}</span>
 						{#if g.admin}<span class="role admin">admin</span>{/if}
 						{#if g.invitation_only}<span class="role invite">invite-only</span>{/if}
+						{#if sort === 'activity' && ts}
+							<span class="activity-meta" title={new Date(Number(ts) * 1000).toLocaleString()}>
+								active {relativeDate(ts)}
+							</span>
+						{/if}
 					</a>
 				</li>
 			{/each}
@@ -173,6 +246,24 @@
 	.role.admin {
 		color: var(--accent);
 		border-color: var(--accent);
+	}
+	.activity-meta {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--fg-muted);
+		margin-top: 0.1rem;
+	}
+	.activity-error {
+		max-width: 80rem;
+		margin: 0.3rem auto 0;
+		padding: 0 1.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: #ff7a3d;
+	}
+	.sort button:disabled {
+		opacity: 0.6;
+		cursor: progress;
 	}
 	.empty {
 		text-align: center;

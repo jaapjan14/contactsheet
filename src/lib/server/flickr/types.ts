@@ -252,6 +252,12 @@ export interface FlickrGroupInfo {
 	rules?: FlickrTextNode;
 	throttle?: { count: number; mode: string; remaining: number };
 	privacy?: number;
+	// Unix-seconds of the most-recent activity in the group
+	// (post/photo/topic). Wrapped as a FlickrTextNode in `groups.getInfo`
+	// responses, but Flickr returns a bare string in `groups.search` — handle
+	// both shapes defensively at read time. Used by /user/[id]/groups for the
+	// sort-by-recent-activity option.
+	dateactivity?: FlickrTextNode | string | number;
 }
 
 export interface GroupsGetInfoResponse {

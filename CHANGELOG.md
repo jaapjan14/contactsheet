@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.5.1 (2026-05-18)
+
+### Added
+
+- **"Sort by recent activity" on `/user/[id]/groups`.** Works for any
+  user's groups page (not just your own). Clicking the new "Activity"
+  button lazy-fetches `flickr.groups.getInfo` in parallel for each of
+  the user's groups, sorts the list by `dateactivity` descending, and
+  shows a relative "active 3h ago" / "active 2mo ago" badge on each
+  row so it's obvious why a group is where it is.
+
+  Lazy because a fresh crawl of ~100 groups runs ~1-3s while
+  Flickr's getInfo calls fan out — initial page render stays instant
+  and the user opts in. Once fetched, the data lives in component
+  state, so toggling between Joined / A-Z / Activity is free. SQLite
+  cache (24h on `groups.getInfo`) means subsequent visits to the same
+  groups page short-circuit to a few ms.
+
+  Backed by a new `/api/groups/activity?ids=…` endpoint that takes a
+  comma-separated NSID list (max 250) and returns `{ activity:
+  { nsid: unix-seconds | null } }`. `dateactivity` added to the
+  `FlickrGroupInfo` type (with a `FlickrTextNode | string | number`
+  union since Flickr's response wraps it differently across endpoints).
+
 ## v1.5.0 (2026-05-18)
 
 ### Added
