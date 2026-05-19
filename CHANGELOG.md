@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.4.6 (2026-05-18)
+
+### Fixed
+
+- **Blue tint after double-click-to-zoom on a photo.** Safari was
+  painting its default double-click text-selection on the `<img>`
+  element a beat before the zoom handler ran, leaving a translucent
+  blue overlay across the lightbox (and sometimes the header above
+  it, when the selection extended). `<figure>` now carries
+  `user-select: none` / `-webkit-user-select: none` so the selection
+  is never created in the first place, and `onDblClick` in
+  `src/lib/zoom.ts` also calls
+  `window.getSelection()?.removeAllRanges()` as belt-and-suspenders
+  for the corner case where a selection was extended from a prior
+  click before the zoom handler bound. Metadata sidebar lives outside
+  `<figure>` and stays selectable for copy/paste.
+
 ## v1.4.5 (2026-05-18)
 
 ### Changed

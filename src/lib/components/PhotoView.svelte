@@ -1286,6 +1286,12 @@
 		border-radius: 4px;
 		overflow: hidden;
 		position: relative;
+		/* Suppress Safari's default double-click text-selection on the image —
+		   without this, every dblclick-to-zoom would paint a translucent blue
+		   selection overlay across the lightbox before the zoom handler runs.
+		   The metadata sidebar lives outside <figure> and stays selectable. */
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	.nav {
 		position: absolute;

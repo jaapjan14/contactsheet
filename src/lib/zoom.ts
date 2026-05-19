@@ -199,6 +199,14 @@ export function makeZoomer(img: HTMLImageElement, opts: ZoomerOptions = {}): Zoo
 	function onDblClick(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
+		// Belt-and-suspenders for the Safari double-click selection-overlay bug.
+		// The figure has user-select: none so the selection shouldn't appear in
+		// the first place, but if Safari has already created one (e.g. the
+		// previous click extended a range past the figure), clear it now so the
+		// zoom doesn't trail a blue tint.
+		if (typeof window !== 'undefined') {
+			window.getSelection()?.removeAllRanges();
+		}
 		toggleAt(e.clientX, e.clientY);
 	}
 
