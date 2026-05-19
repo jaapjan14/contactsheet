@@ -54,15 +54,20 @@ export async function resolveUserId(input: string): Promise<string> {
 
 	const sig = await authSig();
 	return wrap(key('resolveUserId', { input: trimmed, sig }), TTL, async () => {
+		console.log(`[resolveUserId] start input="${trimmed}" sig=${sig}`);
+
 		// 1. URL/path-alias lookup
 		try {
 			const res = await flickr<LookupUserResponse>({
 				method: 'flickr.urls.lookupUser',
 				params: { url: `https://www.flickr.com/photos/${trimmed}/` }
 			});
+			console.log(`[resolveUserId] hit via lookupUser → ${res.user.id}`);
 			return res.user.id;
-		} catch {
-			/* fall through */
+		} catch (err) {
+			console.log(
+				`[resolveUserId] lookupUser miss: ${err instanceof FlickrError ? `${err.code}/${err.message}` : String(err)}`
+			);
 		}
 
 		// 2. Screen-name lookup
@@ -71,31 +76,43 @@ export async function resolveUserId(input: string): Promise<string> {
 				method: 'flickr.people.findByUsername',
 				params: { username: trimmed }
 			});
+			console.log(`[resolveUserId] hit via findByUsername → ${res.user.nsid || res.user.id}`);
 			return res.user.nsid || res.user.id;
 		} catch (err) {
-			// If we don't have auth available, the people.search fallback below
-			// will reject for "Missing signature" — so on no-auth, surface the
-			// findByUsername error now (which is typically the most descriptive
-			// "User not found" message).
+			console.log(
+				`[resolveUserId] findByUsername miss: ${err instanceof FlickrError ? `${err.code}/${err.message}` : String(err)}`
+			);
 			if (!err || !(err instanceof FlickrError)) throw err;
-			// continue to fallback
 		}
 
 		// 3. Display-name search (signed). Returns multiple candidates ranked
 		// by Flickr's own relevance; we pick the first one. Common-name
 		// ambiguity ("John Smith") is a known limitation — future work could
 		// surface a disambiguation page.
-		const res = await flickrMaybeSigned<PeopleSearchResponse>({
-			method: 'flickr.people.search',
-			params: { text: trimmed, per_page: '10' }
-		});
-		const rawPerson = res.people?.person;
-		const personArr = Array.isArray(rawPerson) ? rawPerson : rawPerson ? [rawPerson] : [];
-		const first = personArr[0];
-		const nsid = first?.nsid || first?.id;
-		if (!nsid) {
-			throw new FlickrError(1, `User "${trimmed}" not found`);
+		try {
+			const res = await flickrMaybeSigned<PeopleSearchResponse>({
+				method: 'flickr.people.search',
+				params: { text: trimmed, per_page: '10' }
+			});
+			console.log(
+				`[resolveUserId] people.search raw=`,
+				JSON.stringify(res).slice(0, 400)
+			);
+			const rawPerson = res.people?.person;
+			const personArr = Array.isArray(rawPerson) ? rawPerson : rawPerson ? [rawPerson] : [];
+			const first = personArr[0];
+			const nsid = first?.nsid || first?.id;
+			if (!nsid) {
+				console.log(`[resolveUserId] people.search returned 0 candidates`);
+				throw new FlickrError(1, `User "${trimmed}" not found`);
+			}
+			console.log(`[resolveUserId] hit via people.search → ${nsid} (of ${personArr.length})`);
+			return nsid;
+		} catch (err) {
+			console.log(
+				`[resolveUserId] people.search miss: ${err instanceof FlickrError ? `${err.code}/${err.message}` : String(err)}`
+			);
+			throw err;
 		}
-		return nsid;
 	});
 }
