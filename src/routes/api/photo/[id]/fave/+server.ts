@@ -1,13 +1,14 @@
 import { error, json } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { flickrAuth } from '$lib/server/flickr/authenticated';
-import { del, delPrefix, key } from '$lib/server/cache';
+import { delPrefix } from '$lib/server/cache';
 import type { RequestHandler } from './$types';
 
 function invalidate(photoId: string) {
 	// Drop the user's own faves list (every page) and this photo's count
+	// (any auth-sig variant).
 	delPrefix('favorites.getList|');
-	del(key('photos.favoritesCount', { photo_id: photoId }));
+	delPrefix(`photos.favoritesCount|photo_id=${photoId}`);
 }
 
 export const POST: RequestHandler = async ({ params }) => {

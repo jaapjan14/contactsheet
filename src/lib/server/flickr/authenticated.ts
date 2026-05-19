@@ -37,3 +37,20 @@ export async function flickrMaybeSigned<T = unknown>(
 	}
 	return flickr<T>(opts);
 }
+
+/**
+ * Cache key suffix that distinguishes signed-vs-anonymous responses for
+ * helpers that wrap `flickrMaybeSigned` with the SQLite cache. Flickr
+ * sometimes returns different field values for signed vs unsigned calls
+ * (e.g., a private group's `topic_count` is `0` unsigned but `1` for the
+ * admin), so a single shared cache slot can poison the other auth context
+ * with the wrong value. Threading this into the cache `key()` params keeps
+ * the two responses in separate slots.
+ *
+ * Single-user app today — `'1'` (auth present) or `'0'` (no auth) is
+ * sufficient. If multi-user lands someday, swap this for a per-user
+ * identifier so each user has their own cache namespace.
+ */
+export async function authSig(): Promise<string> {
+	return (await readAuth()) ? '1' : '0';
+}

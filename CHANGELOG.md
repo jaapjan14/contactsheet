@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.4.4 (2026-05-18)
+
+### Changed
+
+- **SQLite cache is now auth-aware** for every helper that wraps a
+  `flickrMaybeSigned` call. Flickr returns different field values for
+  signed vs unsigned requests against the same endpoint (e.g., a
+  private group's `topic_count` was `0` for unsigned callers but `1`
+  for the admin), and the old single-slot cache let one auth
+  context's response poison the other. Each cached call now appends
+  a `sig=1` / `sig=0` suffix to its key via a new `authSig()` helper
+  in `src/lib/server/flickr/authenticated.ts`, keeping the two
+  contexts in separate cache slots.
+- Cache invalidation in the mutation endpoints (post-comment,
+  fave-toggle, group join/leave/photo-add/remove) switched from
+  exact-key `del()` to `delPrefix()` so a write busts both the
+  signed and anonymous variants of the affected resource.
+- Affected helpers: `getGroupInfo`, `getUserGroups`, `getGroupPhotos`,
+  `getPhotoInfo`, `getPhotoSizes`, `getPhotoExif`, `getPhotoComments`,
+  `getPhotoFavoritesCount`, `getPhotoContexts`,
+  `getGroupDiscussTopics`, `getDiscussTopicReplies`.
+- This was the underlying cause of the
+  proactive-discussions-disabled banner in v1.4.3 failing to trigger
+  for the first user who visited a private group while signed in: a
+  prior anonymous fetch had cached `topic_count: 0`, which masked the
+  signal until the cache was busted manually. Won't recur.
+
 ## v1.4.3 (2026-05-18)
 
 ### Added

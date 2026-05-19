@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { flickrAuth } from '$lib/server/flickr/authenticated';
-import { del, key } from '$lib/server/cache';
+import { delPrefix } from '$lib/server/cache';
 import type { RequestHandler } from './$types';
 
 interface AddCommentResponse {
@@ -24,8 +24,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			method: 'flickr.photos.comments.addComment',
 			params: { photo_id: params.id, comment_text: text }
 		});
-		// Drop the cached comment list so the next reload pulls the real entry
-		del(key('photos.comments', { photo_id: params.id }));
+		// Drop the cached comment list (any auth-sig variant) so the next
+		// reload pulls the real entry.
+		delPrefix(`photos.comments|photo_id=${params.id}`);
 		return json({ ok: true, commentId: res.comment.id });
 	} catch (err) {
 		if (err instanceof FlickrError) throw error(502, err.message);

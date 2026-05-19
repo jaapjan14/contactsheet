@@ -1,5 +1,5 @@
 import { FlickrError } from './client';
-import { flickrMaybeSigned } from './authenticated';
+import { authSig, flickrMaybeSigned } from './authenticated';
 import { wrap, key, get as cacheGet, set as cacheSet } from '$lib/server/cache';
 import type {
 	PhotosGetInfoResponse,
@@ -36,7 +36,8 @@ export async function getPhotoInfo(photoId: string): Promise<FlickrPhotoInfo> {
 	// Key suffix bumped when TTL_INFO dropped from 7d → 1h, so any entries
 	// written under the old long TTL are orphaned and get purged on schedule
 	// instead of serving stale view counts for up to a week.
-	return wrap(key('photos.getInfo.v2', { photo_id: photoId }), TTL_INFO, async () => {
+	const sig = await authSig();
+	return wrap(key('photos.getInfo.v2', { photo_id: photoId, sig }), TTL_INFO, async () => {
 		const res = await flickrMaybeSigned<PhotosGetInfoResponse>({
 			method: 'flickr.photos.getInfo',
 			params: { photo_id: photoId }
@@ -73,7 +74,8 @@ interface AllContextsResponse {
 }
 
 export async function getPhotoContexts(photoId: string): Promise<PhotoContexts> {
-	return wrap(key('photos.getAllContexts', { photo_id: photoId }), TTL_CONTEXTS, async () => {
+	const sig = await authSig();
+	return wrap(key('photos.getAllContexts', { photo_id: photoId, sig }), TTL_CONTEXTS, async () => {
 		const res = await flickrMaybeSigned<AllContextsResponse>({
 			method: 'flickr.photos.getAllContexts',
 			params: { photo_id: photoId }
@@ -89,7 +91,8 @@ export async function getPhotoSizes(photoId: string): Promise<FlickrSizeEntry[]>
 	// Key suffix bumped when TTL_SIZES dropped from 7d → 1h, so entries written
 	// under the old long TTL are orphaned and get re-fetched instead of serving
 	// URLs whose secret has since rotated (broken-image / HTTP 410).
-	return wrap(key('photos.getSizes.v2', { photo_id: photoId }), TTL_SIZES, async () => {
+	const sig = await authSig();
+	return wrap(key('photos.getSizes.v2', { photo_id: photoId, sig }), TTL_SIZES, async () => {
 		const res = await flickrMaybeSigned<PhotosGetSizesResponse>({
 			method: 'flickr.photos.getSizes',
 			params: { photo_id: photoId }
@@ -105,7 +108,8 @@ export async function getPhotoSizes(photoId: string): Promise<FlickrSizeEntry[]>
 export async function getPhotoExif(
 	photoId: string
 ): Promise<PhotosGetExifResponse['photo'] | null> {
-	const k = key('photos.getExif', { photo_id: photoId });
+	const sig = await authSig();
+	const k = key('photos.getExif', { photo_id: photoId, sig });
 	const cached = cacheGet<PhotosGetExifResponse['photo']>(k);
 	if (cached) return cached;
 	try {
@@ -122,7 +126,8 @@ export async function getPhotoExif(
 }
 
 export async function getPhotoComments(photoId: string): Promise<FlickrComment[]> {
-	return wrap(key('photos.comments', { photo_id: photoId }), TTL_COMMENTS, async () => {
+	const sig = await authSig();
+	return wrap(key('photos.comments', { photo_id: photoId, sig }), TTL_COMMENTS, async () => {
 		try {
 			const res = await flickrMaybeSigned<PhotosCommentsGetListResponse>({
 				method: 'flickr.photos.comments.getList',
@@ -171,7 +176,8 @@ export interface PhotoFaver {
  * so we hit `getFavorites` with per_page=1 and read `total`.
  */
 export async function getPhotoFavoritesCount(photoId: string): Promise<number> {
-	return wrap(key('photos.favoritesCount', { photo_id: photoId }), TTL_FAVES, async () => {
+	const sig = await authSig();
+	return wrap(key('photos.favoritesCount', { photo_id: photoId, sig }), TTL_FAVES, async () => {
 		try {
 			const res = await flickrMaybeSigned<FavoritesCountResponse>({
 				method: 'flickr.photos.getFavorites',

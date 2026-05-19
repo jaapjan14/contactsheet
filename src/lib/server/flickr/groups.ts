@@ -1,6 +1,6 @@
 import { flickr } from './client';
-import { flickrAuth, flickrMaybeSigned } from './authenticated';
-import { wrap, key, del, delPrefix } from '$lib/server/cache';
+import { authSig, flickrAuth, flickrMaybeSigned } from './authenticated';
+import { wrap, key, delPrefix } from '$lib/server/cache';
 import type {
 	GroupsGetInfoResponse,
 	GroupsPoolGetPhotosResponse,
@@ -32,7 +32,8 @@ interface PeopleGetGroupsResponse {
  * every Groups-tab click. Cached 5 minutes.
  */
 export async function getUserGroups(userId: string): Promise<FlickrUserGroup[]> {
-	return wrap(key('people.getGroups', { user_id: userId }), TTL_USER_GROUPS, async () => {
+	const sig = await authSig();
+	return wrap(key('people.getGroups', { user_id: userId, sig }), TTL_USER_GROUPS, async () => {
 		const res = await flickrMaybeSigned<PeopleGetGroupsResponse>({
 			method: 'flickr.people.getGroups',
 			params: { user_id: userId }
@@ -99,7 +100,8 @@ export async function resolveGroupId(input: string): Promise<string> {
  * requests. flickrMaybeSigned attaches Jacob's token if present.
  */
 export async function getGroupInfo(groupId: string): Promise<FlickrGroupInfo> {
-	return wrap(key('groups.getInfo', { group_id: groupId }), TTL_INFO, async () => {
+	const sig = await authSig();
+	return wrap(key('groups.getInfo', { group_id: groupId, sig }), TTL_INFO, async () => {
 		const res = await flickrMaybeSigned<GroupsGetInfoResponse>({
 			method: 'flickr.groups.getInfo',
 			params: { group_id: groupId }
@@ -128,7 +130,7 @@ export async function joinGroup(
 		method: 'flickr.groups.join',
 		params
 	});
-	del(key('people.getGroups', { user_id: meNsid }));
+	delPrefix(`people.getGroups|user_id=${meNsid}`);
 }
 
 /**
@@ -141,7 +143,7 @@ export async function leaveGroup(meNsid: string, groupId: string): Promise<void>
 		method: 'flickr.groups.leave',
 		params: { group_id: groupId }
 	});
-	del(key('people.getGroups', { user_id: meNsid }));
+	delPrefix(`people.getGroups|user_id=${meNsid}`);
 }
 
 /**
@@ -159,7 +161,7 @@ export async function addPhotoToGroup(
 		method: 'flickr.groups.pools.add',
 		params: { photo_id: photoId, group_id: groupId }
 	});
-	del(key('photos.getAllContexts', { photo_id: photoId }));
+	delPrefix(`photos.getAllContexts|photo_id=${photoId}`);
 	delPrefix(`groups.pools.getPhotos|group_id=${groupId}`);
 }
 
@@ -176,7 +178,7 @@ export async function removePhotoFromGroup(
 		method: 'flickr.groups.pools.remove',
 		params: { photo_id: photoId, group_id: groupId }
 	});
-	del(key('photos.getAllContexts', { photo_id: photoId }));
+	delPrefix(`photos.getAllContexts|photo_id=${photoId}`);
 	delPrefix(`groups.pools.getPhotos|group_id=${groupId}`);
 }
 
@@ -190,8 +192,9 @@ export async function getGroupPhotos(
 	page = 1,
 	perPage = DEFAULT_PER_PAGE
 ): Promise<PhotosPage> {
+	const sig = await authSig();
 	return wrap(
-		key('groups.pools.getPhotos', { group_id: groupId, page, per_page: perPage }),
+		key('groups.pools.getPhotos', { group_id: groupId, page, per_page: perPage, sig }),
 		TTL_POOL,
 		async () => {
 			const res = await flickrMaybeSigned<GroupsPoolGetPhotosResponse>({

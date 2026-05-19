@@ -1,4 +1,4 @@
-import { flickrAuth, flickrMaybeSigned } from './authenticated';
+import { authSig, flickrAuth, flickrMaybeSigned } from './authenticated';
 import { wrap, key, delPrefix } from '$lib/server/cache';
 import type {
 	DiscussRepliesGetListResponse,
@@ -28,8 +28,9 @@ export async function getGroupDiscussTopics(
 	page = 1,
 	perPage = DEFAULT_TOPICS_PER_PAGE
 ): Promise<TopicsPage> {
+	const sig = await authSig();
 	return wrap(
-		key('groups.discuss.topics.getList', { group_id: groupId, page, per_page: perPage }),
+		key('groups.discuss.topics.getList', { group_id: groupId, page, per_page: perPage, sig }),
 		TTL_TOPICS,
 		async () => {
 			const res = await flickrMaybeSigned<DiscussTopicsGetListResponse>({
@@ -64,12 +65,14 @@ export async function getDiscussTopicReplies(
 	page = 1,
 	perPage = DEFAULT_REPLIES_PER_PAGE
 ): Promise<RepliesPage> {
+	const sig = await authSig();
 	return wrap(
 		key('groups.discuss.replies.getList', {
 			topic_id: topicId,
 			group_id: groupId,
 			page,
-			per_page: perPage
+			per_page: perPage,
+			sig
 		}),
 		TTL_REPLIES,
 		async () => {
