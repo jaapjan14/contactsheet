@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.5.2 (2026-05-18)
+
+### Changed
+
+- **Reverted v1.5.0's `flickr.people.search` fallback** — confirmed
+  via signed-call logging that the method is restricted to partner
+  API keys, returning error 122 "Not a valid API key" for our
+  consumer key. The path was effectively a no-op that ended in 404
+  anyway, so the resolver is back to its two documented public
+  attempts: `urls.lookupUser` then `people.findByUsername`. Auth-sig
+  cache key (v1.4.4) and the JSDoc explaining the limitation stay.
+- **Helpful `/user/[id]/+error.svelte`** replaces the bare 404 page
+  for user-resolution failures. Surfaces:
+  - A short explanation of what ContactSheet can resolve (URL,
+    path-alias slug, NSID).
+  - A one-click shortcut to Flickr's own People search for the
+    typed query, so the user can grab the right URL.
+  - A fallback "search photos mentioning X" shortcut to `/search?q=…`
+    in case they were looking for photo content, not a person.
+  - A "← Back home" link.
+
+  Real-world impact: typing "Andy Johnsson" no longer dead-ends —
+  the error page tells you why the lookup can't work and gives you
+  a path to get there in one click.
+
 ## v1.5.1 (2026-05-18)
 
 ### Added
