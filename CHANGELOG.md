@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.4.0 (2026-05-18)
+
+### Added
+
+- **Group discussions Phase 2 — post, edit, and delete.** Signed-in
+  users can now participate in discussion threads, not just read them.
+
+  - **Reply compose** at the bottom of every topic page (hidden when
+    the topic is locked or the viewer is anonymous). Optimistically
+    appends the new reply with the user's identity and the current
+    timestamp; reconciles to Flickr's actual reply ID from the
+    `replies.add` response.
+  - **Edit / delete own replies.** A pencil + trash icon row on each
+    reply that the API marks `can_edit` / `can_delete`. Pencil swaps
+    the body for a textarea with Save/Cancel; trash prompts for
+    confirmation, then removes the reply from the list. Same pattern
+    as the photo lightbox's inline edit.
+  - **Edit / delete the topic itself.** Same affordance on the OP
+    body and subject. Deleting the topic invalidates the page data
+    and bounces back to the discussions list.
+  - **New topic** form on the discussions list — a "+ New topic"
+    button toggles a disclosure with subject + body fields. On
+    success, redirects straight to the new topic's thread page.
+  - **Six new write helpers** in `src/lib/server/flickr/discussions.ts`:
+    `addReply`, `editReply`, `deleteReply`, `addTopic`, `editTopic`,
+    `deleteTopic`. All require `flickrAuth`, all invalidate the broad
+    topic-list and replies-list cache prefixes for the affected
+    group/topic so the next fresh fetch reflects the change.
+  - **New API endpoints:**
+    - `POST /api/discuss/[topicId]/replies` — add a reply
+    - `PATCH /api/discuss/[topicId]/replies/[replyId]` — edit a reply
+    - `DELETE /api/discuss/[topicId]/replies/[replyId]` — delete a reply
+    - `POST /api/group/[id]/discussions` — add a new topic
+    - `PATCH /api/discuss/[topicId]` — edit topic subject + body
+    - `DELETE /api/discuss/[topicId]` — delete a topic
+
+  Phase 3 (FTS5 search over crawled topics — hybrid corpus,
+  opportunistic by default with a per-group on-demand crawl button)
+  is the next deferred step.
+
 ## v1.3.1 (2026-05-18)
 
 ### Fixed

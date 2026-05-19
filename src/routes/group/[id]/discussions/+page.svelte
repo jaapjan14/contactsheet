@@ -19,11 +19,19 @@
 
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { goto } from '$app/navigation';
 	import GroupChrome from '$lib/components/GroupChrome.svelte';
 	import { decodeFlickrEntities } from '$lib/flickr/text';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	// --- new-topic compose state ---
+	let composeOpen = $state(false);
+	let newSubject = $state('');
+	let newMessage = $state('');
+	let posting = $state(false);
+	let postError: string | null = $state(null);
 
 	const restored = untrack(() =>
 		snapHolder?.groupKey === data.groupKey ? snapHolder : null
@@ -95,6 +103,61 @@
 		else window.location.href = `/group/${data.groupKey}`;
 	}
 
+	async function errorFrom(res: Response): Promise<string> {
+		let msg = `HTTP ${res.status}`;
+		const ct = res.headers.get('content-type') ?? '';
+		if (ct.includes('application/json')) {
+			try {
+				const body = (await res.json()) as { message?: string; error?: string };
+				msg = body.message || body.error || msg;
+			} catch {
+				/* fall through */
+			}
+		} else if (res.status === 502 || res.status === 504) {
+			msg = 'Flickr took too long — try again.';
+		}
+		return msg;
+	}
+
+	function cancelCompose() {
+		composeOpen = false;
+		newSubject = '';
+		newMessage = '';
+		postError = null;
+	}
+
+	async function postNewTopic(e: SubmitEvent) {
+		e.preventDefault();
+		const subj = newSubject.trim();
+		const body = newMessage.trim();
+		if (!subj || !body || posting) return;
+		posting = true;
+		postError = null;
+		try {
+			const res = await fetch(
+				`/api/group/${encodeURIComponent(data.groupKey)}/discussions`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ subject: subj, message: body })
+				}
+			);
+			if (!res.ok) throw new Error(await errorFrom(res));
+			const result = (await res.json()) as { topicId?: string };
+			if (result.topicId) {
+				goto(`/group/${data.groupKey}/discussions/${result.topicId}`);
+			} else {
+				// Fallback: reload the list so the new topic appears
+				cancelCompose();
+				window.location.reload();
+			}
+		} catch (err) {
+			postError = (err as Error).message;
+		} finally {
+			posting = false;
+		}
+	}
+
 	function formatRelativeDate(unixSeconds: string): string {
 		const t = Number(unixSeconds) * 1000;
 		if (!t) return '';
@@ -118,6 +181,49 @@
 </nav>
 
 <GroupChrome group={data.group} groupKey={data.groupKey} activeTab="discussions" />
+
+{#if data.me}
+	<div class="compose-bar">
+		{#if !composeOpen}
+			<button type="button" class="new-topic-btn" onclick={() => (composeOpen = true)}>
+				+ New topic
+			</button>
+		{:else}
+			<form class="new-topic-form" onsubmit={postNewTopic}>
+				<label class="compose-label" for="new-topic-subject">Subject</label>
+				<input
+					id="new-topic-subject"
+					type="text"
+					class="compose-input"
+					bind:value={newSubject}
+					placeholder="Topic subject"
+					autocomplete="off"
+				/>
+				<label class="compose-label" for="new-topic-message">Message</label>
+				<textarea
+					id="new-topic-message"
+					class="compose-textarea"
+					bind:value={newMessage}
+					rows="6"
+					placeholder="What's on your mind?"
+				></textarea>
+				<div class="compose-actions">
+					<button
+						type="submit"
+						class="compose-btn primary"
+						disabled={!newSubject.trim() || !newMessage.trim() || posting}
+					>
+						{posting ? 'posting…' : 'post topic'}
+					</button>
+					<button type="button" class="compose-btn" onclick={cancelCompose} disabled={posting}>
+						cancel
+					</button>
+					{#if postError}<span class="post-error">{postError}</span>{/if}
+				</div>
+			</form>
+		{/if}
+	</div>
+{/if}
 
 {#if data.topicsError}
 	<p class="empty">Can't read discussions for this group — {data.topicsError}.</p>
@@ -187,6 +293,97 @@
 	.back:hover {
 		border-color: var(--accent);
 		color: var(--accent);
+	}
+
+	.compose-bar {
+		max-width: 80rem;
+		margin: 1rem auto 0;
+		padding: 0 1.5rem;
+	}
+	.new-topic-btn {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		padding: 0.45rem 0.95rem;
+		background: var(--bg-elev);
+		color: var(--accent);
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		cursor: pointer;
+		transition: border-color 0.15s;
+	}
+	.new-topic-btn:hover {
+		border-color: var(--accent);
+	}
+	.new-topic-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		background: var(--bg-elev);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.9rem 1rem;
+	}
+	.compose-label {
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		color: var(--fg-muted);
+	}
+	.compose-input,
+	.compose-textarea {
+		background: var(--bg);
+		border: 1px solid var(--border);
+		color: var(--fg);
+		padding: 0.5rem 0.7rem;
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		border-radius: 3px;
+		outline: none;
+	}
+	.compose-input:focus,
+	.compose-textarea:focus {
+		border-color: var(--accent);
+	}
+	.compose-textarea {
+		min-height: 8rem;
+		resize: vertical;
+		line-height: 1.5;
+	}
+	.compose-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.3rem;
+		flex-wrap: wrap;
+	}
+	.compose-btn {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		padding: 0.4rem 0.85rem;
+		background: var(--bg);
+		color: var(--fg-muted);
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		cursor: pointer;
+		transition: border-color 0.15s, color 0.15s;
+	}
+	.compose-btn:hover:not(:disabled) {
+		color: var(--fg);
+		border-color: var(--fg-muted);
+	}
+	.compose-btn.primary {
+		color: var(--accent);
+	}
+	.compose-btn.primary:hover:not(:disabled) {
+		border-color: var(--accent);
+	}
+	.compose-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.post-error {
+		color: #ff7a3d;
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
 	}
 
 	.meta-line {

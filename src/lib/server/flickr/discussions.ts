@@ -1,5 +1,5 @@
-import { flickrMaybeSigned } from './authenticated';
-import { wrap, key } from '$lib/server/cache';
+import { flickrAuth, flickrMaybeSigned } from './authenticated';
+import { wrap, key, delPrefix } from '$lib/server/cache';
 import type {
 	DiscussRepliesGetListResponse,
 	DiscussTopicsGetListResponse,
@@ -92,4 +92,118 @@ export async function getDiscussTopicReplies(
 			};
 		}
 	);
+}
+
+// Write helpers ----------------------------------------------------------------
+//
+// All of these require an authenticated Flickr session (`flickrAuth`).
+// They invalidate the broad topic-list / replies-list cache prefixes for the
+// affected group/topic so the next render reflects the change. Note that
+// per-page cache keys include the page number, so a coarse `delPrefix` is the
+// safest way to make sure neither the first page nor any loaded subsequent
+// pages serve stale data after a write.
+
+function invalidateGroupTopics(groupId: string) {
+	delPrefix(`groups.discuss.topics.getList|group_id=${groupId}`);
+}
+
+function invalidateTopicReplies(topicId: string) {
+	delPrefix(`groups.discuss.replies.getList|topic_id=${topicId}`);
+}
+
+interface ReplyAddResponse {
+	stat: string;
+	reply?: { id?: string };
+}
+
+/**
+ * Post a new reply to a topic. Returns the new reply's ID when Flickr
+ * surfaces it (the response shape isn't 100% consistent across topic
+ * versions — callers should treat the ID as optional and refetch the
+ * thread to confirm placement).
+ */
+export async function addReply(
+	topicId: string,
+	groupId: string,
+	message: string
+): Promise<string | undefined> {
+	const res = await flickrAuth<ReplyAddResponse>({
+		method: 'flickr.groups.discuss.replies.add',
+		params: { topic_id: topicId, message }
+	});
+	invalidateTopicReplies(topicId);
+	invalidateGroupTopics(groupId);
+	return res.reply?.id;
+}
+
+export async function editReply(
+	topicId: string,
+	replyId: string,
+	groupId: string,
+	message: string
+): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.discuss.replies.edit',
+		params: { topic_id: topicId, reply_id: replyId, message }
+	});
+	invalidateTopicReplies(topicId);
+	invalidateGroupTopics(groupId);
+}
+
+export async function deleteReply(
+	topicId: string,
+	replyId: string,
+	groupId: string
+): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.discuss.replies.delete',
+		params: { topic_id: topicId, reply_id: replyId }
+	});
+	invalidateTopicReplies(topicId);
+	invalidateGroupTopics(groupId);
+}
+
+interface TopicAddResponse {
+	stat: string;
+	topic?: { id?: string };
+}
+
+/**
+ * Post a new topic to a group's discussion board. Returns the new topic's
+ * ID so the caller can redirect to its thread page.
+ */
+export async function addTopic(
+	groupId: string,
+	subject: string,
+	message: string
+): Promise<string | undefined> {
+	const res = await flickrAuth<TopicAddResponse>({
+		method: 'flickr.groups.discuss.topics.add',
+		params: { group_id: groupId, subject, message }
+	});
+	invalidateGroupTopics(groupId);
+	return res.topic?.id;
+}
+
+export async function editTopic(
+	topicId: string,
+	groupId: string,
+	subject: string,
+	message: string
+): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.discuss.topics.edit',
+		params: { topic_id: topicId, subject, message }
+	});
+	invalidateTopicReplies(topicId);
+	invalidateGroupTopics(groupId);
+}
+
+export async function deleteTopic(topicId: string, groupId: string): Promise<void> {
+	await flickrAuth({
+		method: 'flickr.groups.discuss.topics.delete',
+		params: { topic_id: topicId }
+	});
+	invalidateTopicReplies(topicId);
+	invalidateGroupTopics(groupId);
 }
