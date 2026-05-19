@@ -51,19 +51,33 @@ export async function getGroupDiscussTopics(
 	);
 }
 
+/**
+ * Flickr's documented contract says `replies.getList` only needs `topic_id`,
+ * but in practice the API returns "Topic not found" (code 1) on every call
+ * unless `group_id` is also passed. This appears to be a long-standing bug in
+ * the discussion endpoints — calling routes always know the group context, so
+ * threading it through is cheap. Verified 2026-05-18 against the live API.
+ */
 export async function getDiscussTopicReplies(
 	topicId: string,
+	groupId: string,
 	page = 1,
 	perPage = DEFAULT_REPLIES_PER_PAGE
 ): Promise<RepliesPage> {
 	return wrap(
-		key('groups.discuss.replies.getList', { topic_id: topicId, page, per_page: perPage }),
+		key('groups.discuss.replies.getList', {
+			topic_id: topicId,
+			group_id: groupId,
+			page,
+			per_page: perPage
+		}),
 		TTL_REPLIES,
 		async () => {
 			const res = await flickrMaybeSigned<DiscussRepliesGetListResponse>({
 				method: 'flickr.groups.discuss.replies.getList',
 				params: {
 					topic_id: topicId,
+					group_id: groupId,
 					per_page: String(perPage),
 					page: String(page)
 				}

@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ params }) => {
 			if (err instanceof FlickrError) return null;
 			throw err;
 		}),
-		getDiscussTopicReplies(params.topicId, 1).catch((err: unknown) => {
+		getDiscussTopicReplies(params.topicId, groupId, 1).catch((err: unknown) => {
 			if (err instanceof FlickrError) {
 				throw error(404, `Can't read this topic: ${err.message}`);
 			}

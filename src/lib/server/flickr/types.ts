@@ -270,15 +270,21 @@ export interface UrlsLookupGroupResponse {
 
 // Group discussions ---------------------------------------------------------
 
+// Topic shape in the topics.getList response. Author avatar lives on
+// `iconserver`/`iconfarm` (no `author_` prefix). The reply-list response
+// uses the prefixed form for the same author info — see FlickrDiscussTopicHead
+// below.
 export interface FlickrDiscussTopic {
 	id: string;
 	subject: string;
 	author: string;
 	authorname: string;
-	author_iconserver?: string;
-	author_iconfarm?: number;
 	author_path_alias?: string | null;
-	author_role?: string;
+	author_is_deleted?: number;
+	is_pro?: number;
+	role?: string;
+	iconserver?: string;
+	iconfarm?: number;
 	is_sticky?: number;
 	is_locked?: number;
 	can_edit?: number;
@@ -290,14 +296,18 @@ export interface FlickrDiscussTopic {
 	message?: FlickrTextNode;
 }
 
+// Reply shape in the replies.getList response. Author avatar is on
+// `iconserver`/`iconfarm` (no prefix) — same convention as FlickrDiscussTopic.
 export interface FlickrDiscussReply {
 	id: string;
 	author: string;
 	authorname: string;
-	author_iconserver?: string;
-	author_iconfarm?: number;
 	author_path_alias?: string | null;
-	author_role?: string;
+	author_is_deleted?: number;
+	is_pro?: number;
+	role?: string;
+	iconserver?: string;
+	iconfarm?: number;
 	can_edit?: number;
 	can_delete?: number;
 	datecreate: string;
@@ -305,10 +315,17 @@ export interface FlickrDiscussReply {
 	message: FlickrTextNode;
 }
 
+// Topic head returned alongside replies in the replies.getList response. This
+// one *does* prefix the author's avatar (`author_iconserver`/`author_iconfarm`)
+// because the unprefixed `iconserver`/`iconfarm` belong to the GROUP itself
+// here, not the topic author. Yes, the same author fields are named
+// differently across the two endpoints — that's Flickr's API design, not
+// ours.
 export interface FlickrDiscussTopicHead {
 	topic_id: string;
 	subject: string;
 	group_id: string;
+	group_alias?: string;
 	iconserver?: string;
 	iconfarm?: number;
 	name?: string;
@@ -317,7 +334,9 @@ export interface FlickrDiscussTopicHead {
 	author_iconserver?: string;
 	author_iconfarm?: number;
 	author_path_alias?: string | null;
-	author_role?: string;
+	author_is_deleted?: number;
+	is_pro?: number;
+	role?: string;
 	is_sticky?: number;
 	is_locked?: number;
 	can_edit?: number;
@@ -325,6 +344,7 @@ export interface FlickrDiscussTopicHead {
 	can_reply?: number;
 	datecreate: string;
 	datelastpost: string;
+	lastedit?: string;
 	total_replies?: string;
 	message: FlickrTextNode;
 }

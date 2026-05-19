@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.3.1 (2026-05-18)
+
+### Fixed
+
+- **Clicking a discussion topic no longer 404s with "Topic not found."**
+  Flickr's `flickr.groups.discuss.replies.getList` documents
+  `topic_id` as the only required argument, but in practice the API
+  returns code 1 / "Topic not found" on every call unless `group_id`
+  is also passed. Verified against the live API. `getDiscussTopicReplies`
+  now takes a `groupId` argument and threads it through; the
+  `/api/discuss/[topicId]/replies` endpoint accepts a required
+  `group_id` query param, and the thread page client passes it
+  through automatically.
+- **Reply buddyicons render correctly.** Type definitions had the reply
+  author's avatar on `author_iconserver`/`author_iconfarm` (matching the
+  topic-head shape), but `replies.getList` returns reply author info on
+  the unprefixed `iconserver`/`iconfarm` instead. Updated
+  `FlickrDiscussReply` / `FlickrDiscussTopic` to match the actual API
+  shape; topic-head keeps the prefixed form because in that response
+  the unprefixed icon fields refer to the group, not the author. (Yes,
+  the same author fields are named differently across the two
+  endpoints; that's Flickr's design.)
+
 ## v1.3.0 (2026-05-18)
 
 ### Added

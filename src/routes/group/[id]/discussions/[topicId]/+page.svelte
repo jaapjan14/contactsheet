@@ -62,7 +62,7 @@
 		try {
 			const next = currentPage + 1;
 			const res = await fetch(
-				`/api/discuss/${encodeURIComponent(data.topicId)}/replies?page=${next}`
+				`/api/discuss/${encodeURIComponent(data.topicId)}/replies?page=${next}&group_id=${encodeURIComponent(data.groupKey)}`
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const pageData = (await res.json()) as { reply: FlickrDiscussReply[]; page: number };
@@ -179,7 +179,7 @@
 						>
 							<img
 								class="author-icon"
-								src={buddyIcon(r.author, r.author_iconserver, r.author_iconfarm)}
+								src={buddyIcon(r.author, r.iconserver, r.iconfarm)}
 								alt=""
 							/>
 							{r.authorname}
