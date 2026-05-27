@@ -41,12 +41,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	if (!message) throw error(400, 'Message is required');
 
 	const groupId = await resolveOr404(params.id);
-	console.log(`[discuss.topics.add] start group=${groupId} subject="${subject.slice(0, 60)}" msgLen=${message.length}`);
 
 	try {
 		const topicId = await addTopic(groupId, subject, message);
-		const elapsed = Date.now() - t0;
-		console.log(`[discuss.topics.add] ok group=${groupId} topicId=${topicId} elapsed=${elapsed}ms`);
 		return json({ ok: true, topicId });
 	} catch (err) {
 		const elapsed = Date.now() - t0;

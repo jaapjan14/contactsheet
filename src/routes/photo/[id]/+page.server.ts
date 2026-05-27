@@ -111,6 +111,11 @@ export const load: PageServerLoad = async ({ params }) => {
 		};
 	} catch (err) {
 		if (err instanceof FlickrError) {
+			// Transient upstream failure (Flickr 5xx "panda" outage or a 429
+			// rate-limit) — surface a retryable 503 rather than a misleading 404.
+			if ((err.httpStatus && err.httpStatus >= 500) || err.httpStatus === 429) {
+				throw error(503, 'Flickr is temporarily unavailable. Please try again in a moment.');
+			}
 			throw error(404, err.message);
 		}
 		throw err;

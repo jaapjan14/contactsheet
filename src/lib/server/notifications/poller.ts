@@ -187,15 +187,13 @@ async function tick(): Promise<void> {
 	if (!auth) return; // no signed-in Flickr user yet — skip silently
 
 	try {
-		const a = await pollActivity();
-		if (a.inserted > 0) console.log(`[notifications] +${a.inserted} activity events`);
+		await pollActivity();
 	} catch (err) {
 		console.error('[notifications] activity poll failed:', err);
 	}
 
 	try {
-		const e = await pollExplore(auth.nsid);
-		if (e.inserted > 0) console.log(`[notifications] +${e.inserted} explore hits`);
+		await pollExplore(auth.nsid);
 	} catch (err) {
 		console.error('[notifications] explore poll failed:', err);
 	}

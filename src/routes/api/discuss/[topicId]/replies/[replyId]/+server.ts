@@ -28,11 +28,8 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	if (!message) throw error(400, 'Empty reply');
 	const groupId = await resolveGroupOr400(body.group_id);
 
-	console.log(`[discuss.replies.edit] start topic=${params.topicId} reply=${params.replyId} group=${groupId} msgLen=${message.length}`);
 	try {
 		await editReply(params.topicId, params.replyId, groupId, message);
-		const elapsed = Date.now() - t0;
-		console.log(`[discuss.replies.edit] ok topic=${params.topicId} reply=${params.replyId} elapsed=${elapsed}ms`);
 		return json({ ok: true });
 	} catch (err) {
 		const elapsed = Date.now() - t0;
@@ -61,11 +58,8 @@ export const DELETE: RequestHandler = async ({ params, request, url }) => {
 	}
 	const groupId = await resolveGroupOr400(groupParam);
 
-	console.log(`[discuss.replies.delete] start topic=${params.topicId} reply=${params.replyId} group=${groupId}`);
 	try {
 		await deleteReply(params.topicId, params.replyId, groupId);
-		const elapsed = Date.now() - t0;
-		console.log(`[discuss.replies.delete] ok topic=${params.topicId} reply=${params.replyId} elapsed=${elapsed}ms`);
 		return json({ ok: true });
 	} catch (err) {
 		const elapsed = Date.now() - t0;

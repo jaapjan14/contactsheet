@@ -33,11 +33,8 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	if (!subject || !message) throw error(400, 'subject and message are required');
 	const groupId = await resolveGroupOr400(body.group_id);
 
-	console.log(`[discuss.topics.edit] start topic=${params.topicId} group=${groupId} subject="${subject.slice(0, 60)}"`);
 	try {
 		await editTopic(params.topicId, groupId, subject, message);
-		const elapsed = Date.now() - t0;
-		console.log(`[discuss.topics.edit] ok topic=${params.topicId} elapsed=${elapsed}ms`);
 		return json({ ok: true });
 	} catch (err) {
 		const elapsed = Date.now() - t0;
@@ -64,11 +61,8 @@ export const DELETE: RequestHandler = async ({ params, request, url }) => {
 	}
 	const groupId = await resolveGroupOr400(groupParam);
 
-	console.log(`[discuss.topics.delete] start topic=${params.topicId} group=${groupId}`);
 	try {
 		await deleteTopic(params.topicId, groupId);
-		const elapsed = Date.now() - t0;
-		console.log(`[discuss.topics.delete] ok topic=${params.topicId} elapsed=${elapsed}ms`);
 		return json({ ok: true });
 	} catch (err) {
 		const elapsed = Date.now() - t0;

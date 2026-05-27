@@ -13,7 +13,14 @@ export interface FlickrCallOptions {
 export class FlickrError extends Error {
 	constructor(
 		public code: number,
-		message: string
+		message: string,
+		/**
+		 * Set when the failure was an HTTP transport error (a Flickr outage /
+		 * "panda" 5xx page, or a 429 rate-limit) rather than an API-level
+		 * `stat:fail`. Lets routes map transient upstream failures to a
+		 * retryable state instead of a misleading "not found".
+		 */
+		public httpStatus?: number
 	) {
 		super(message);
 		this.name = 'FlickrError';
@@ -44,7 +51,13 @@ export async function flickr<T = unknown>(opts: FlickrCallOptions): Promise<T> {
 	const qs = new URLSearchParams(finalParams).toString();
 	const res = await fetch(`${REST_ENDPOINT}?${qs}`);
 	if (!res.ok) {
-		throw new Error(`Flickr HTTP ${res.status}: ${await res.text()}`);
+		// Truncate the body: Flickr's 5xx "panda" responses are full HTML error
+		// pages that otherwise flood the logs. 200 chars is enough to identify
+		// the cause. Throw a FlickrError (not a plain Error) carrying the HTTP
+		// status so callers can catch it like any other Flickr failure and
+		// distinguish a transient outage/rate-limit from an API-level error.
+		const body = (await res.text()).replace(/\s+/g, ' ').trim().slice(0, 200);
+		throw new FlickrError(res.status, `Flickr HTTP ${res.status}: ${body}`, res.status);
 	}
 	const json = (await res.json()) as { stat: string; code?: number; message?: string };
 	if (json.stat !== 'ok') {

@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.5.3 (2026-05-26)
+
+### Fixed
+
+- **Flickr outages and rate-limits no longer surface as a hard 500.**
+  An HTTP-level failure from Flickr (a 5xx "panda" error page, or a
+  429 rate-limit) previously threw a plain `Error` that no route's
+  `instanceof FlickrError` handler caught, so it fell through to a
+  blank 500 — and the entire HTML "panda" page got dumped into the
+  server logs. The Flickr client now throws a `FlickrError` carrying
+  the HTTP status (`httpStatus`) and truncates the body to 200 chars.
+  Every route's existing error handling now treats a transient
+  upstream failure gracefully (502 / graceful-empty on optional
+  panels) instead of crashing, and the photo page maps upstream
+  5xx/429 to a retryable 503 ("Flickr is temporarily unavailable")
+  rather than a misleading 404.
+
+### Changed
+
+- **Quieter logs for shipped features.** Removed the success-path
+  `console.log` noise that was useful while building but is just
+  chatter in production: the per-tick `[notifications] +N` lines and
+  the `[discuss.*] start` / `[discuss.*] ok` per-write timing lines.
+  All `console.error` / `console.warn` failure logging is retained.
+
+### Added
+
+- **`favicon.ico`** for legacy browsers and crawlers that request the
+  root `/favicon.ico` path, eliminating a recurring 404. Multi-size
+  (16/32/48) ICO matching the existing SVG contact-sheet grid; the
+  modern SVG/PNG `<link>` icons remain primary.
+
 ## v1.5.2 (2026-05-18)
 
 ### Changed

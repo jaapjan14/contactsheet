@@ -52,11 +52,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		throw err;
 	}
 
-	console.log(`[discuss.replies.add] start topic=${params.topicId} group=${groupId} msgLen=${message.length}`);
 	try {
 		const replyId = await addReply(params.topicId, groupId, message);
-		const elapsed = Date.now() - t0;
-		console.log(`[discuss.replies.add] ok topic=${params.topicId} replyId=${replyId} elapsed=${elapsed}ms`);
 		return json({ ok: true, replyId });
 	} catch (err) {
 		const elapsed = Date.now() - t0;
