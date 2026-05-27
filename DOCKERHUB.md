@@ -79,14 +79,15 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - `latest` — current release
 - `vX.Y.Z` — pinned release
 
-## What's new in v1.1.0
+## What's new in v1.5.3 (since v1.1.0)
 
-- **Manage group memberships from the lightbox** — for owned photos, the "In groups" disclosure now includes a typeahead that filters your Flickr group memberships and one-clicks the photo into any of them, plus an `×` per existing row to remove the photo from that group. Groups requiring rules acceptance (e.g. Rodinal Developer) get a small modal showing the rules with an "I agree" → join flow that mirrors flickr.com.
-- **Feed tab** — a personal "what's new from your contacts" stream.
-- **Photo overlay refactor** — clicking a thumbnail no longer page-navigates; the lightbox now opens as a `pushState` overlay over the grid, so closing is a pure `history.back()` with the grid still mounted and at scroll. Forward-nav from the lightbox (clicking a photographer/commenter) now correctly scrolls the destination page to top instead of inheriting the grid's saved scroll.
-- **Notifications: full fave backfill** — `flickr.activity.userPhotos` truncates per-photo events, so a photo that picked up 98 faves in a day previously surfaced as ~2 notifications. The poller now enumerates the full faver list (`flickr.photos.getFavorites`, capped at 100/photo, 30-day window) for any photo with fave activity.
-- **No more broken-image for up to a week after a Flickr photo replace** — `getPhotoSizes` was cached 7 d but its URLs embed the photo's `secret`, which rotates on replace. TTL dropped to 1 h; cache key bumped to evict.
-- **Better group/join error UX** — Cloudflare 502 HTML pages no longer dump into the membership-error pane; clean "Flickr took too long — try again" instead.
+- **Group discussions** — a group's page now has a Discussions tab listing recent topics with reply counts and last-reply dates; click into a topic for the full threaded view. Signed in, you can **post, edit, and delete** your own topics and replies, with Flickr's own error messages surfaced cleanly and a proactive notice when a group has discussions disabled.
+- **Instant lightbox + streamed photo load** — clicking a thumbnail opens the lightbox as an overlay immediately; the image and the social/group panels (comments, faves, "in albums/groups") stream in progressively rather than blocking the open. Closing is still a pure `history.back()` with your grid scroll intact.
+- **Sort groups by recent activity** — the groups page gains an "Activity" sort that ranks a user's groups by most-recent activity, with a relative "active 3h ago" badge per row.
+- **Auth-aware cache** — signed and anonymous responses for the same endpoint are now cached separately, so a private group's signed values can no longer be poisoned by an anonymous fetch (or vice-versa).
+- **Graceful Flickr-outage handling** — a Flickr 5xx "panda" page or 429 rate-limit now degrades to a retryable state instead of a hard 500, and never dumps Flickr's HTML error page into your logs.
+- **Helpful "user not found" page** — typing a multi-word display name no longer dead-ends; the page explains what ContactSheet can resolve (URL, path-alias, NSID) and one-clicks you to Flickr's people search.
+- Smaller polish: accent-colored commenter names, a photo-zoom double-click fix, and a `favicon.ico` for legacy clients.
 
 ## Highlights
 
@@ -94,7 +95,8 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - Lightbox with EXIF, comments, fave/fave-count, "in albums/groups" disclosures, pinch/ctrl-wheel zoom
 - High-res progressive load — preview paints instantly, X-Large 6K then Original swap in on fullscreen
 - Combined search: free text + user + tags + sort, **also surfaces matching Flickr groups** in the same result set
-- Background notifications poller — new faves, comments, and Explore hits, dedup'd by composite source ID
+- Group discussions — browse topics and replies, and post/edit/delete your own when signed in
+- Background notifications poller — new faves, comments, and Explore hits, dedup'd by composite source ID, surfaced in an in-app bell
 - SQLite response cache (better-sqlite3) wraps every Flickr API call with per-endpoint TTLs
 - Hand-rolled OAuth 1.0a (no oauth dep) — HMAC-SHA1 signer, single-user token store
 - App-password gate fronts every route with HMAC-signed session cookie + per-request CSP nonce
