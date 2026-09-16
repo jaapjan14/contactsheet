@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.5.4 (2026-09-15)
+
+### Added
+
+- **Inline search on a user's Photostream.** A search icon above the grid
+  (matching Flickr's own per-profile search) expands into a text box that
+  scopes `flickr.photos.search` to that user only, via the existing
+  `user_id` param the global `/search` page already used. Results replace
+  the grid in place — pagination, snapshot/back-nav, and the load-more
+  sentinel all switch to the search endpoint while a query is active, and
+  the profile header shows "Photostream" instead of the misleading total
+  photo count during a search. Clearing the search (✕) returns to the
+  normal photostream. Scoped to Photostream only for now — Albums/Faves/
+  Galleries don't have it.
+
 ## v1.5.3 (2026-05-26)
 
 ### Fixed
