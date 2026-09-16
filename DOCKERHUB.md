@@ -79,8 +79,9 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - `latest` — current release
 - `vX.Y.Z` — pinned release
 
-## What's new in v1.5.3 (since v1.1.0)
+## What's new in v1.5.4 (since v1.1.0)
 
+- **Per-profile photo search** — a search icon on a user's Photostream now scopes Flickr search to just that person's photos, matching Flickr's own profile search. Results replace the grid in place; clear the search to return to the full stream.
 - **Group discussions** — a group's page now has a Discussions tab listing recent topics with reply counts and last-reply dates; click into a topic for the full threaded view. Signed in, you can **post, edit, and delete** your own topics and replies, with Flickr's own error messages surfaced cleanly and a proactive notice when a group has discussions disabled.
 - **Instant lightbox + streamed photo load** — clicking a thumbnail opens the lightbox as an overlay immediately; the image and the social/group panels (comments, faves, "in albums/groups") stream in progressively rather than blocking the open. Closing is still a pure `history.back()` with your grid scroll intact.
 - **Sort groups by recent activity** — the groups page gains an "Activity" sort that ranks a user's groups by most-recent activity, with a relative "active 3h ago" badge per row.
