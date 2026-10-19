@@ -79,8 +79,9 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - `latest` — current release
 - `vX.Y.Z` — pinned release
 
-## What's new in v1.5.4 (since v1.1.0)
+## What's new in v1.6.0 (since v1.1.0)
 
+- **Sort control on Photostream, Faves and group pools** — a sort dropdown above each grid, remembered per tab across every user and group. Photostreams now open by **date taken, newest first** (Flickr's own API can only list a stream newest-*posted* first, so bulk uploads and old scans looked jumbled), with date posted and "interesting" a click away. Faves can sort by date faved or date taken; group pools by date added, date taken or interesting.
 - **Per-profile photo search** — a search icon on a user's Photostream now scopes Flickr search to just that person's photos, matching Flickr's own profile search. Results replace the grid in place; clear the search to return to the full stream.
 - **Group discussions** — a group's page now has a Discussions tab listing recent topics with reply counts and last-reply dates; click into a topic for the full threaded view. Signed in, you can **post, edit, and delete** your own topics and replies, with Flickr's own error messages surfaced cleanly and a proactive notice when a group has discussions disabled.
 - **Instant lightbox + streamed photo load** — clicking a thumbnail opens the lightbox as an overlay immediately; the image and the social/group panels (comments, faves, "in albums/groups") stream in progressively rather than blocking the open. Closing is still a pure `history.back()` with your grid scroll intact.
@@ -93,6 +94,7 @@ absorbs most of it — most pages re-render from cache for several minutes after
 ## Highlights
 
 - 7-tab user view: photostream · about · albums · faves · galleries · groups · camera roll · stats
+- Sortable grids — photostream, faves and group pools by date taken, date posted/faved/added or interestingness
 - Lightbox with EXIF, comments, fave/fave-count, "in albums/groups" disclosures, pinch/ctrl-wheel zoom
 - High-res progressive load — preview paints instantly, X-Large 6K then Original swap in on fullscreen
 - Combined search: free text + user + tags + sort, **also surfaces matching Flickr groups** in the same result set
