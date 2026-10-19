@@ -5,6 +5,7 @@
 	interface SnapState {
 		userKey: string;
 		query: string;
+		sort: string;
 		photos: FlickrPhotoSummary[];
 		currentPage: number;
 		totalPages: number;
@@ -24,6 +25,7 @@
 	import { tick, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import UserChrome from '$lib/components/UserChrome.svelte';
+	import SortSelect from '$lib/components/SortSelect.svelte';
 	import { photoUrl } from '$lib/flickr/urls';
 	import { onCellClick } from '$lib/photo-overlay';
 	import type { PageData } from './$types';
@@ -31,7 +33,9 @@
 	let { data }: { data: PageData } = $props();
 
 	const restored = untrack(() =>
-		snapHolder?.userKey === data.userKey && snapHolder?.query === data.query
+		snapHolder?.userKey === data.userKey &&
+		snapHolder?.query === data.query &&
+		snapHolder?.sort === data.sort
 			? snapHolder
 			: null
 	);
@@ -44,6 +48,7 @@
 	let loading = $state(false);
 	let lastUserKey = $state(untrack(() => data.userKey));
 	let lastQuery = $state(untrack(() => data.query));
+	let lastSort = $state(untrack(() => data.sort));
 	let sentinelEl: HTMLElement | null = $state(null);
 
 	// Search-box UI state. Expanded whenever a search is active so the query
@@ -64,9 +69,10 @@
 	}
 
 	$effect(() => {
-		if (data.userKey !== lastUserKey || data.query !== lastQuery) {
+		if (data.userKey !== lastUserKey || data.query !== lastQuery || data.sort !== lastSort) {
 			lastUserKey = data.userKey;
 			lastQuery = data.query;
+			lastSort = data.sort;
 			photos = data.photos.photo;
 			currentPage = data.photos.page;
 			totalPages = data.photos.pages;
@@ -78,6 +84,7 @@
 		snapHolder = {
 			userKey: data.userKey,
 			query: data.query,
+			sort: data.sort,
 			photos,
 			currentPage,
 			totalPages
@@ -95,7 +102,7 @@
 			const next = currentPage + 1;
 			const url = data.query
 				? `/api/search/photos?user=${encodeURIComponent(data.userKey)}&q=${encodeURIComponent(data.query)}&page=${next}`
-				: `/api/user/${encodeURIComponent(data.userKey)}/photos?page=${next}`;
+				: `/api/user/${encodeURIComponent(data.userKey)}/photos?page=${next}&sort=${data.sort}`;
 			const res = await fetch(url);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const pageData = (await res.json()) as { photo: FlickrPhotoSummary[]; page: number };
@@ -166,6 +173,7 @@
 			<button type="button" class="icon-btn" aria-label="Close search" title="Close" onclick={clearSearch}>✕</button>
 		</form>
 	{:else}
+		<SortSelect tab="photostream" value={data.sort} />
 		<button type="button" class="icon-btn" aria-label="Search this photostream" title="Search" onclick={openSearch}>
 			🔍
 		</button>
@@ -210,6 +218,7 @@
 	.toolbar {
 		display: flex;
 		justify-content: flex-end;
+		gap: 0.4rem;
 		max-width: 80rem;
 		margin: 0.75rem auto 0;
 		padding: 0 1.5rem;

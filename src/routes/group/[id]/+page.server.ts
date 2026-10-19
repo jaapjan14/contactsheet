@@ -1,7 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
-import { resolveGroupId, getGroupInfo, getGroupPhotos } from '$lib/server/flickr/groups';
+import { resolveGroupId, getGroupInfo } from '$lib/server/flickr/groups';
 import { searchPhotos } from '$lib/server/flickr/search';
+import { getGroupPage } from '$lib/server/flickr/sorted';
+import { pickSort, sortCookieName } from '$lib/sort';
 import type { PhotosPage } from '$lib/server/flickr/types';
 import type { PageServerLoad } from './$types';
 
@@ -13,7 +15,7 @@ const EMPTY_POOL: PhotosPage = {
 	photo: []
 };
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, cookies }) => {
 	let groupId: string;
 	try {
 		groupId = await resolveGroupId(params.id);
@@ -39,13 +41,14 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// `?q=…` switches the grid into in-group search mode (photos.search scoped
 	// to this group_id). Empty/missing q falls back to the regular pool listing.
 	const q = (url.searchParams.get('q') ?? '').trim();
+	const sort = pickSort('group', url.searchParams.get('sort'), cookies.get(sortCookieName('group')));
 
 	let photos: PhotosPage = EMPTY_POOL;
 	let poolError: string | null = null;
 	try {
 		photos = q
 			? await searchPhotos({ groupId, text: q, page: 1, sort: 'relevance' })
-			: await getGroupPhotos(groupId, 1);
+			: await getGroupPage(groupId, sort, 1);
 	} catch (err) {
 		if (err instanceof FlickrError) {
 			poolError = err.message;
@@ -60,6 +63,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		group: info,
 		photos,
 		poolError,
-		query: q
+		query: q,
+		sort
 	};
 };

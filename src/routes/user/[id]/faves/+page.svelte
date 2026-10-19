@@ -4,6 +4,7 @@
 
 	interface SnapState {
 		userKey: string;
+		sort: string;
 		photos: FlickrPhotoSummary[];
 		currentPage: number;
 		totalPages: number;
@@ -20,6 +21,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import UserChrome from '$lib/components/UserChrome.svelte';
+	import SortSelect from '$lib/components/SortSelect.svelte';
 	import { photoUrl } from '$lib/flickr/urls';
 	import { onCellClick } from '$lib/photo-overlay';
 	import type { PageData } from './$types';
@@ -27,7 +29,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const restored = untrack(() =>
-		snapHolder?.userKey === data.userKey ? snapHolder : null
+		snapHolder?.userKey === data.userKey && snapHolder?.sort === data.sort ? snapHolder : null
 	);
 
 	let photos = $state<FlickrPhotoSummary[]>(
@@ -37,6 +39,7 @@
 	let totalPages = $state(untrack(() => restored?.totalPages ?? data.faves.pages));
 	let loading = $state(false);
 	let lastUserKey = $state(untrack(() => data.userKey));
+	let lastSort = $state(untrack(() => data.sort));
 	let sentinelEl: HTMLElement | null = $state(null);
 
 	function stashStream(ids: string[], userKey: string) {
@@ -51,13 +54,14 @@
 	}
 
 	$effect(() => {
-		if (data.userKey !== lastUserKey) {
+		if (data.userKey !== lastUserKey || data.sort !== lastSort) {
 			lastUserKey = data.userKey;
+			lastSort = data.sort;
 			photos = data.faves.photo;
 			currentPage = data.faves.page;
 			totalPages = data.faves.pages;
 		}
-		snapHolder = { userKey: data.userKey, photos, currentPage, totalPages };
+		snapHolder = { userKey: data.userKey, sort: data.sort, photos, currentPage, totalPages };
 		stashStream(
 			photos.map((p) => p.id),
 			data.userKey
@@ -70,7 +74,7 @@
 		try {
 			const next = currentPage + 1;
 			const res = await fetch(
-				`/api/user/${encodeURIComponent(data.userKey)}/faves?page=${next}`
+				`/api/user/${encodeURIComponent(data.userKey)}/faves?page=${next}&sort=${data.sort}`
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const pageData = (await res.json()) as { photo: FlickrPhotoSummary[]; page: number };
@@ -108,6 +112,16 @@
 	isSelf={data.me?.nsid === data.user.nsid}
 />
 
+<div class="toolbar">
+	<SortSelect tab="faves" value={data.sort} />
+</div>
+
+{#if data.faves.capped}
+	<p class="sort-note">
+		Sorted within the {data.faves.sortedCount.toLocaleString()} most recently faved photos.
+	</p>
+{/if}
+
 <div class="grid">
 	{#each photos as p (p.id)}
 		<a
@@ -137,6 +151,22 @@
 {/if}
 
 <style>
+	.toolbar {
+		display: flex;
+		justify-content: flex-end;
+		max-width: 80rem;
+		margin: 0.75rem auto 0;
+		padding: 0 1.5rem;
+	}
+	.sort-note {
+		max-width: 80rem;
+		margin: 0.6rem auto 0;
+		padding: 0 1.5rem;
+		color: var(--fg-muted);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		text-align: right;
+	}
 	.grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);

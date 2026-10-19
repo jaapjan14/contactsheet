@@ -66,3 +66,52 @@ export async function getUserFaves(
 		}
 	);
 }
+
+// Upper bound on how many faves we pull to sort by date taken: 8 calls of 500.
+// Faves beyond this (the oldest-faved) are left out of the date-taken orders.
+const SORT_CAP = 4000;
+const SORT_BATCH = 500;
+
+export interface SortedFavesPage extends PhotosPage {
+	/** true when the user has more faves than SORT_CAP, so the sort only covers the most recent ones */
+	capped: boolean;
+	/** how many faves the sorted order covers (= total unless capped) */
+	sortedCount: number;
+}
+
+/**
+ * Faves ordered by date taken. Neither faves endpoint takes a sort param (both
+ * return newest-faved first), so fetch the list in 500s, sort it here and
+ * slice out the requested page. Each 500-batch rides the getUserFaves cache.
+ */
+export async function getUserFavesByDateTaken(
+	targetUserId: string,
+	order: 'asc' | 'desc',
+	page = 1,
+	perPage = DEFAULT_PER_PAGE
+): Promise<SortedFavesPage> {
+	const first = await getUserFaves(targetUserId, 1, SORT_BATCH);
+	const batches = Math.min(Number(first.pages), SORT_CAP / SORT_BATCH);
+	const rest = await Promise.all(
+		Array.from({ length: Math.max(0, batches - 1) }, (_, i) =>
+			getUserFaves(targetUserId, i + 2, SORT_BATCH)
+		)
+	);
+	const all = [first, ...rest].flatMap((b) => b.photo);
+	// datetaken is "YYYY-MM-DD HH:MM:SS", so string order is date order.
+	all.sort((a, b) => (a.datetaken ?? '').localeCompare(b.datetaken ?? ''));
+	if (order === 'desc') all.reverse();
+
+	const pages = Math.max(1, Math.ceil(all.length / perPage));
+	return {
+		page,
+		pages,
+		perpage: perPage,
+		total: Number(first.total),
+		photo: all.slice((page - 1) * perPage, page * perPage),
+		// Compare pages, not counts: Flickr's total includes faves it won't
+		// return (deleted/now-private photos), so the counts rarely match.
+		capped: Number(first.pages) > batches,
+		sortedCount: all.length
+	};
+}

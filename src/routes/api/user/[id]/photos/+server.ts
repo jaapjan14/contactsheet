@@ -1,11 +1,13 @@
 import { error, json } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { resolveUserId } from '$lib/server/flickr/users';
-import { getUserPhotos } from '$lib/server/flickr/people';
+import { getPhotostreamPage } from '$lib/server/flickr/sorted';
+import { pickSort } from '$lib/sort';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+	const sort = pickSort('photostream', url.searchParams.get('sort'), null);
 
 	let userId: string;
 	try {
@@ -16,7 +18,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	}
 
 	try {
-		const photos = await getUserPhotos(userId, page);
+		const photos = await getPhotostreamPage(userId, sort, page);
 		return json(photos);
 	} catch (err) {
 		if (err instanceof FlickrError) throw error(502, err.message);

@@ -2,10 +2,11 @@ import { error } from '@sveltejs/kit';
 import { FlickrError } from '$lib/server/flickr/client';
 import { resolveUserId } from '$lib/server/flickr/users';
 import { getPersonInfo } from '$lib/server/flickr/people';
-import { getUserFaves } from '$lib/server/flickr/favorites';
+import { getFavesPage } from '$lib/server/flickr/sorted';
+import { pickSort, sortCookieName } from '$lib/sort';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url, cookies }) => {
 	let userId: string;
 	try {
 		userId = await resolveUserId(params.id);
@@ -16,12 +17,14 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw err;
 	}
 
-	const [user, faves] = await Promise.all([getPersonInfo(userId), getUserFaves(userId, 1)]);
+	const sort = pickSort('faves', url.searchParams.get('sort'), cookies.get(sortCookieName('faves')));
+	const [user, faves] = await Promise.all([getPersonInfo(userId), getFavesPage(userId, sort, 1)]);
 
 	return {
 		userKey: params.id,
 		userId,
 		user,
-		faves
+		faves,
+		sort
 	};
 };

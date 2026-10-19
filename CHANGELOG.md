@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.6.0 (2026-10-18)
+
+### Added
+
+- **Sort control on Photostream, Faves and group pools.** A sort dropdown
+  above each grid. The choice is carried in `?sort=` and remembered per
+  tab in a cookie (`cs_sort_photostream` / `cs_sort_faves` /
+  `cs_sort_group`), so it applies to every user and group until changed.
+  Load-more, the snapshot/back-nav state and the lightbox stream all
+  follow the active order.
+  - **Photostream** now opens by **date taken, newest first** (was date
+    posted, which `flickr.people.getPhotos` returns with no sort option,
+    so bulk uploads and old scans looked jumbled). Options: date taken
+    newest/oldest, date posted newest/oldest, interesting. Everything but
+    date-posted-newest goes through `photos.search&user_id=`; those orders
+    are photos-only (videos are excluded, as on /search).
+  - **Faves:** date faved (default, the native order), date taken
+    newest/oldest. Neither faves endpoint can sort, so the date-taken
+    orders fetch the list in batches of 500 (up to 4,000 faves) and sort
+    server-side; above that a note says the sort covers the most recently
+    faved 4,000.
+  - **Group pools:** date added (default, native), date taken
+    newest/oldest, interesting, via `photos.search&group_id=`. Flickr's
+    date-taken order on groups is exact per day but can swap photos within
+    the same day. The dropdown hides while an in-group search is active
+    (results are by relevance).
+
 ## v1.5.4 (2026-09-15)
 
 ### Added

@@ -5,6 +5,7 @@
 	interface SnapState {
 		groupKey: string;
 		query: string;
+		sort: string;
 		photos: FlickrPhotoSummary[];
 		currentPage: number;
 		totalPages: number;
@@ -23,12 +24,15 @@
 	import { photoUrl } from '$lib/flickr/urls';
 	import { onCellClick } from '$lib/photo-overlay';
 	import GroupChrome from '$lib/components/GroupChrome.svelte';
+	import SortSelect from '$lib/components/SortSelect.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const restored = untrack(() =>
-		snapHolder?.groupKey === data.groupKey && snapHolder?.query === data.query
+		snapHolder?.groupKey === data.groupKey &&
+		snapHolder?.query === data.query &&
+		snapHolder?.sort === data.sort
 			? snapHolder
 			: null
 	);
@@ -41,6 +45,7 @@
 	let loading = $state(false);
 	let lastGroupKey = $state(untrack(() => data.groupKey));
 	let lastQuery = $state(untrack(() => data.query));
+	let lastSort = $state(untrack(() => data.sort));
 	// Local copy of the search input — we let the user type, then the form
 	// submits to /group/[id]?q=… and the server reloads in search mode.
 	let searchDraft = $state(untrack(() => data.query));
@@ -66,9 +71,10 @@
 	}
 
 	$effect(() => {
-		if (data.groupKey !== lastGroupKey || data.query !== lastQuery) {
+		if (data.groupKey !== lastGroupKey || data.query !== lastQuery || data.sort !== lastSort) {
 			lastGroupKey = data.groupKey;
 			lastQuery = data.query;
+			lastSort = data.sort;
 			photos = data.photos.photo;
 			currentPage = data.photos.page;
 			totalPages = data.photos.pages;
@@ -77,6 +83,7 @@
 		snapHolder = {
 			groupKey: data.groupKey,
 			query: data.query,
+			sort: data.sort,
 			photos,
 			currentPage,
 			totalPages
@@ -94,6 +101,7 @@
 			const next = currentPage + 1;
 			const params = new URLSearchParams({ page: String(next) });
 			if (data.query) params.set('q', data.query);
+			else params.set('sort', data.sort);
 			const res = await fetch(
 				`/api/group/${encodeURIComponent(data.groupKey)}/photos?${params.toString()}`
 			);
@@ -147,6 +155,8 @@
 	/>
 	{#if data.query}
 		<a class="clear" href="/group/{data.groupKey}" title="Clear search">×</a>
+	{:else}
+		<span class="sort-slot"><SortSelect tab="group" value={data.sort} /></span>
 	{/if}
 </form>
 
@@ -232,6 +242,9 @@
 	}
 	.group-search input:focus {
 		border-color: var(--accent);
+	}
+	.sort-slot {
+		margin-left: auto;
 	}
 	.clear {
 		font-family: var(--font-mono);
