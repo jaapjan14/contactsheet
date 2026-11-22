@@ -79,8 +79,9 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - `latest` — current release
 - `vX.Y.Z` — pinned release
 
-## What's new in v1.6.0 (since v1.1.0)
+## What's new in v1.6.1 (since v1.1.0)
 
+- **No more broken images when Flickr throttles** — Flickr's image CDN briefly refuses the big sizes (HTTP 429) after a browser has pulled a lot of images quickly. The lightbox now shows the 1024px version instead of a broken-image icon, retries the full size in the background, and swaps it back in once Flickr lets it through.
 - **Sort control on Photostream, Faves and group pools** — a sort dropdown above each grid, remembered per tab across every user and group. Photostreams now open by **date taken, newest first** (Flickr's own API can only list a stream newest-*posted* first, so bulk uploads and old scans looked jumbled), with date posted and "interesting" a click away. Faves can sort by date faved or date taken; group pools by date added, date taken or interesting.
 - **Per-profile photo search** — a search icon on a user's Photostream now scopes Flickr search to just that person's photos, matching Flickr's own profile search. Results replace the grid in place; clear the search to return to the full stream.
 - **Group discussions** — a group's page now has a Discussions tab listing recent topics with reply counts and last-reply dates; click into a topic for the full threaded view. Signed in, you can **post, edit, and delete** your own topics and replies, with Flickr's own error messages surfaced cleanly and a proactive notice when a group has discussions disabled.
