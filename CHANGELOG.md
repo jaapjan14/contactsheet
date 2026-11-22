@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.6.1 (2026-11-22)
+
+### Fixed
+
+- **Broken image in the lightbox when Flickr throttles.** Flickr's image
+  CDN (`live.staticflickr.com`) answers HTTP 429 to a browser that has
+  pulled a lot of big images in a short window, and it throttles the
+  1600 / 2048 / 3K+ sizes while Large 1024 and below keep loading. The
+  lightbox asks for the 2048 size, so it showed a broken-image icon until
+  the throttle lifted (a minute or two). Now, when the display image fails,
+  the lightbox swaps in the largest size ≤1024 and retries the full size
+  in the background (after 15s, 30s, 60s, 120s), swapping it back in once
+  it loads. A direct page load is covered too: an image that fails before
+  hydration is detected from the element's state.
+
 ## v1.6.0 (2026-10-18)
 
 ### Added

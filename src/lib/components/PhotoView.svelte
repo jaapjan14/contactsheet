@@ -16,6 +16,8 @@
 	export interface PhotoViewData {
 		photo: FlickrPhotoInfo;
 		display: FlickrSizeEntry;
+		// Smaller size (≤1024) to swap in when the CDN 429s the display size.
+		fallback?: FlickrSizeEntry | null;
 		highRes: FlickrSizeEntry | null;
 		maxRes: FlickrSizeEntry | null;
 		photoSizes: FlickrSizeEntry[];
@@ -835,11 +837,73 @@
 		};
 	});
 
+	// Display-size failure recovery. Flickr's CDN (live.staticflickr.com)
+	// throttles a browser that has pulled many big images quickly: the 1600 /
+	// 2048 / 3K+ sizes come back HTTP 429 for a minute or two while Large 1024
+	// keeps loading. Without this the lightbox showed a broken-image icon.
+	// On error: swap to data.fallback, then retry the display size in the
+	// background with backoff and swap back once it loads.
+	let displayFailed = $state(false);
+	let displayRetry = $state(0);
+	$effect(() => {
+		void data.photo.id;
+		displayFailed = false;
+		displayRetry = 0;
+	});
+
+	const RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000];
+	$effect(() => {
+		if (!displayFailed) return;
+		const attempt = displayRetry;
+		if (attempt >= RETRY_DELAYS_MS.length) return;
+		const url = display.source;
+		const photoIdAtStart = data.photo.id;
+		let cancelled = false;
+		const preloader = new Image();
+		const timer = setTimeout(() => {
+			preloader.onload = () => {
+				if (cancelled || data.photo.id !== photoIdAtStart) return;
+				displayFailed = false;
+			};
+			preloader.onerror = () => {
+				if (cancelled || data.photo.id !== photoIdAtStart) return;
+				displayRetry = attempt + 1;
+			};
+			preloader.src = url;
+		}, RETRY_DELAYS_MS[attempt]);
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+			preloader.onload = null;
+			preloader.onerror = null;
+		};
+	});
+
+	function onImgError() {
+		// Only the display tier can fail here: highRes/maxRes are swapped in
+		// only after their own preloader succeeded.
+		if (displayFailed || !data.fallback) return;
+		if (imgSrc !== display.source) return;
+		console.warn('display image failed, using fallback', display.source);
+		displayFailed = true;
+	}
+
+	// On a direct page load the SSR'd <img> can fail before hydration attaches
+	// onerror, so the event never reaches us. Catch that case by checking the
+	// element's state once it's bound: complete + naturalWidth 0 = load failed.
+	$effect(() => {
+		const el = imgEl;
+		void imgSrc;
+		if (el && el.complete && el.naturalWidth === 0 && el.currentSrc) onImgError();
+	});
+
+	const baseSrc = $derived(displayFailed && data.fallback ? data.fallback.source : display.source);
+
 	const imgSrc = $derived.by(() => {
-		if (!fullscreen) return display.source;
+		if (!fullscreen) return baseSrc;
 		if (imgStage === 'maxRes' && data.maxRes) return data.maxRes.source;
 		if (imgStage === 'highRes' && data.highRes) return data.highRes.source;
-		return display.source;
+		return baseSrc;
 	});
 </script>
 
@@ -853,6 +917,7 @@
 			width={display.width}
 			height={display.height}
 			alt={photo.title._content}
+			onerror={onImgError}
 		/>
 		{#if prevId}
 			<a

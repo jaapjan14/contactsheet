@@ -25,6 +25,23 @@ function pickDisplaySize(sizes: FlickrSizeEntry[]): FlickrSizeEntry | null {
 }
 
 /**
+ * Fallback for when Flickr's CDN refuses the display size. live.staticflickr.com
+ * answers HTTP 429 to a browser that has pulled a lot of big images in a short
+ * window, and the throttle hits the sizes with their own secret (1600 / 2048 /
+ * 3K+) while Large 1024 and below keep loading. Pick the biggest size ≤1024
+ * that's smaller than the display size; null when display is already that small.
+ */
+const FALLBACK_MAX_WIDTH = 1024;
+function pickFallbackSize(sizes: FlickrSizeEntry[], display: FlickrSizeEntry): FlickrSizeEntry | null {
+	const photoSizes = sizes.filter((s) => s.media === 'photo');
+	const longEdge = (s: FlickrSizeEntry) => Math.max(s.width, s.height);
+	const candidates = photoSizes
+		.filter((s) => longEdge(s) <= FALLBACK_MAX_WIDTH && s.width < display.width)
+		.sort((a, b) => b.width - a.width);
+	return candidates[0] ?? null;
+}
+
+/**
  * Mid-tier high-res for the zoom/fullscreen swap. The viewer uses a two-tier
  * progressive enhancement: this fires first because it's 1–3 MB and lands in
  * about a second, giving an immediate sharpness boost. Order of preference:
@@ -79,6 +96,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 		const display = pickDisplaySize(sizes);
 		if (!display) throw error(404, 'No displayable sizes for this photo');
+		const fallback = pickFallbackSize(sizes, display);
 		const highRes = pickHighResSize(sizes, display);
 		const maxRes = pickMaxResSize(sizes, highRes);
 		const photoSizes = sizes.filter((s) => s.media === 'photo');
@@ -100,6 +118,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		return {
 			photo,
 			display,
+			fallback,
 			highRes,
 			maxRes,
 			photoSizes,
