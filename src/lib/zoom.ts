@@ -23,6 +23,8 @@ export interface ZoomerOptions {
 	minScale?: number;
 	maxScale?: number;
 	doubleTapScale?: number;
+	/** Called whenever the image is drawn zoomed past minScale (any input). */
+	onZoom?: () => void;
 }
 
 export interface Zoomer {
@@ -97,6 +99,7 @@ export function makeZoomer(img: HTMLImageElement, opts: ZoomerOptions = {}): Zoo
 		img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
 		img.style.cursor = scale > minScale + 0.001 ? 'grab' : 'zoom-in';
 		flagGestureActive();
+		if (scale > minScale + 0.001) opts.onZoom?.();
 	}
 
 	// Constrain so an image larger than its container always covers it; if

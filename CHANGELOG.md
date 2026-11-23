@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.6.2 (2026-11-23)
+
+### Changed
+
+- **Fullscreen only fetches the 6K and Original once you zoom.** Before,
+  entering fullscreen downloaded the X-Large 6K and then the full Original
+  (15-40 MB) for every photo, zoomed or not. Flickr now rations the big
+  sizes per browser: after enough of them, live.staticflickr.com answers
+  HTTP 429 for every size from 1600 up, including the 2048 the lightbox
+  shows, so the lightbox sat on the soft 1024 fallback for a long time.
+  Now the 6K and Original load only after the photo is zoomed (double-click,
+  pinch or ctrl-wheel), and only for that photo. `makeZoomer` gained an
+  `onZoom` option for this.
+
 ## v1.6.1 (2026-11-22)
 
 ### Fixed

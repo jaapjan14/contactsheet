@@ -753,7 +753,11 @@
 		const target = imgEl;
 		// Wait until the image is laid out so offsetLeft/clientWidth are real.
 		const attach = () => {
-			zoomer = makeZoomer(target);
+			zoomer = makeZoomer(target, {
+				onZoom: () => {
+					if (!zoomedIn) zoomedIn = true;
+				}
+			});
 		};
 		if (target.complete && target.naturalWidth > 0) {
 			attach();
@@ -772,6 +776,15 @@
 	//   stage 'highRes' → X-Large 6K _6k.jpg (~1 MB, swaps in ~1 sec)
 	//   stage 'maxRes'  → Original _o.jpg (15-40 MB, matches Flickr's viewer
 	//                                       pixel-for-pixel; arrives in 10-30s)
+	// Both tiers wait until the photo is actually zoomed (double-click, pinch,
+	// ctrl-wheel). Fetching them on every fullscreen view used up Flickr's
+	// per-browser allowance for the big sizes, after which even the 2048
+	// came back HTTP 429 and the lightbox sat on the soft 1024 fallback.
+	let zoomedIn = $state(false);
+	$effect(() => {
+		void data.photo.id;
+		zoomedIn = false;
+	});
 	// We can't use imperative `target.src = url` — the bound expression
 	// `src={imgSrc}` re-applies on every reactive tick and would yank src
 	// back to display.source.
@@ -782,9 +795,9 @@
 		imgStage = 'display';
 	});
 
-	// Stage 1: load the mid-tier 6K. Runs as soon as fullscreen is entered.
+	// Stage 1: load the mid-tier 6K, once the photo is zoomed in fullscreen.
 	$effect(() => {
-		if (!fullscreen) return;
+		if (!fullscreen || !zoomedIn) return;
 		if (imgStage !== 'display') return;
 		if (!data.highRes) return;
 		const url = data.highRes.source;
@@ -812,7 +825,7 @@
 	// in the background. Big file — but at the point this fires the user
 	// already has a sharp 6K to look at, so the long load is non-blocking.
 	$effect(() => {
-		if (!fullscreen) return;
+		if (!fullscreen || !zoomedIn) return;
 		if (imgStage !== 'highRes' && data.highRes) return;
 		if (imgStage === 'maxRes') return;
 		if (!data.maxRes) return;
