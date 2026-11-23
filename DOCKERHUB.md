@@ -79,8 +79,9 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - `latest` — current release
 - `vX.Y.Z` — pinned release
 
-## What's new in v1.6.1 (since v1.1.0)
+## What's new in v1.6.2 (since v1.1.0)
 
+- **Fullscreen fetches the 6K and Original only when you zoom** — entering fullscreen used to download both big versions (the Original can be 15–40 MB) for every photo. Flickr now rations the large sizes per browser, and that habit used up the allowance fast, leaving the lightbox on the soft 1024px fallback. They now load only after you double-click, pinch or ctrl-scroll to zoom.
 - **No more broken images when Flickr throttles** — Flickr's image CDN briefly refuses the big sizes (HTTP 429) after a browser has pulled a lot of images quickly. The lightbox now shows the 1024px version instead of a broken-image icon, retries the full size in the background, and swaps it back in once Flickr lets it through.
 - **Sort control on Photostream, Faves and group pools** — a sort dropdown above each grid, remembered per tab across every user and group. Photostreams now open by **date taken, newest first** (Flickr's own API can only list a stream newest-*posted* first, so bulk uploads and old scans looked jumbled), with date posted and "interesting" a click away. Faves can sort by date faved or date taken; group pools by date added, date taken or interesting.
 - **Per-profile photo search** — a search icon on a user's Photostream now scopes Flickr search to just that person's photos, matching Flickr's own profile search. Results replace the grid in place; clear the search to return to the full stream.
@@ -97,7 +98,7 @@ absorbs most of it — most pages re-render from cache for several minutes after
 - 7-tab user view: photostream · about · albums · faves · galleries · groups · camera roll · stats
 - Sortable grids — photostream, faves and group pools by date taken, date posted/faved/added or interestingness
 - Lightbox with EXIF, comments, fave/fave-count, "in albums/groups" disclosures, pinch/ctrl-wheel zoom
-- High-res progressive load — preview paints instantly, X-Large 6K then Original swap in on fullscreen
+- High-res progressive load — preview paints instantly, X-Large 6K then Original swap in when you zoom in fullscreen
 - Combined search: free text + user + tags + sort, **also surfaces matching Flickr groups** in the same result set
 - Group discussions — browse topics and replies, and post/edit/delete your own when signed in
 - Background notifications poller — new faves, comments, and Explore hits, dedup'd by composite source ID, surfaced in an in-app bell
